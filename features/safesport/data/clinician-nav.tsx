@@ -3,25 +3,7 @@
 
 "use client";
 
-import {
-  ActivityIcon,
-  ClipboardListIcon,
-  HeartPulseIcon,
-  AlertTriangleIcon,
-  UserCheckIcon,
-  ArrowRightLeftIcon,
-  StethoscopeIcon,
-  TrendingUpIcon,
-  ScanIcon,
-  BrainCircuitIcon,
-  CalendarIcon,
-  ClipboardCheckIcon,
-  ListTodoIcon,
-  BellIcon,
-  MessageSquareIcon,
-  FileTextIcon,
-  AwardIcon,
-} from "lucide-react";
+import { StethoscopeIcon, CalendarIcon, BellIcon, MessageSquareIcon, FileTextIcon, AwardIcon } from "lucide-react";
 import { NotificationBadge } from "../components/notifications/NotificationBadge";
 import { useNotificationStats } from "../hooks/useNotifications";
 

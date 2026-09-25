@@ -3,11 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { 
-  CheckCircle2Icon,
-  EditIcon,
-  AlertCircleIcon,
-} from "lucide-react";
+import { CheckCircle2Icon, EditIcon, AlertCircleIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { AthleteOnboardingData } from "../../../types/onboarding";
 
@@ -23,7 +19,7 @@ interface ProfileReviewStepProps {
 export function ProfileReviewStep({ data, sections, onEdit, onUpdate }: ProfileReviewStepProps) {
   const router = useRouter();
   
-  const allComplete = sections.every((s, i) => {
+  const allComplete = sections.every((s) => {
     // Skip review section itself
     if (s.id === "review") return true;
     return s.status === "complete" || s.status === "not_applicable";
@@ -149,7 +145,7 @@ export function ProfileReviewStep({ data, sections, onEdit, onUpdate }: ProfileR
                     All sections complete
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Your profile is ready. Click "Complete profile" below to finish.
+                    Your profile is ready. Click &quot;Complete profile&quot; below to finish.
                   </p>
                 </div>
               </div>
@@ -163,7 +159,7 @@ export function ProfileReviewStep({ data, sections, onEdit, onUpdate }: ProfileR
                 <ul className="text-sm text-muted-foreground space-y-1 ml-4 list-disc">
                   <li>Your information will be ready for clinical review</li>
                   <li>A clinician will be assigned to complete your physical assessment</li>
-                  <li>You'll receive a notification when your assessment is scheduled</li>
+                  <li>You&apos;ll receive a notification when your assessment is scheduled</li>
                   <li>Your participation eligibility will be determined after the clinical assessment</li>
                 </ul>
               </div>

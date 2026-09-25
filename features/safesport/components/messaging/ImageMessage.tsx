@@ -1,18 +1,19 @@
 "use client"
 
-import { useState } from "react"
-import Image from "next/image"
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { DownloadIcon, Loader2Icon } from "lucide-react"
-import type { Attachment } from "../../types/messaging"
+import Image from "next/image";
+import { useState } from "react";
+
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { DownloadIcon, Loader2Icon } from "lucide-react";
+import type { Attachment } from "../../types/messaging";
 
 interface ImageMessageProps {
   attachment: Attachment
   isCurrentUser?: boolean
 }
 
-export function ImageMessage({ attachment, isCurrentUser }: ImageMessageProps) {
+export function ImageMessage({ attachment }: ImageMessageProps) {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
 
@@ -43,7 +44,7 @@ export function ImageMessage({ attachment, isCurrentUser }: ImageMessageProps) {
         
         <DialogTrigger>
           <button className="relative block rounded-lg overflow-hidden cursor-pointer hover:opacity-95 transition-opacity">
-            <img
+            <Image width={640} height={480} unoptimized
               src={attachment.url}
               alt={attachment.fileName}
               className="w-full h-auto max-h-96 object-contain rounded-lg"
@@ -81,7 +82,7 @@ export function ImageMessage({ attachment, isCurrentUser }: ImageMessageProps) {
 
       <DialogContent className="max-w-4xl p-0">
         <div className="relative">
-          <img
+          <Image width={640} height={480} unoptimized
             src={attachment.url}
             alt={attachment.fileName}
             className="w-full h-auto max-h-[85vh] object-contain"

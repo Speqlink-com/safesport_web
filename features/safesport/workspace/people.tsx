@@ -44,6 +44,8 @@ import {
 import { Records, Rehabilitation, scopedRecords } from "./records";
 import { Assessments, Eligibility, ConsentScreen } from "./clinical";
 import { ClinicianHome } from "./clinician-home";
+import Link from "next/link";
+import { OverviewVisual, RehabilitationVisual } from "./overview-visuals";
 export function Home({ role }: { role: Role }) {
   // Hooks must be called unconditionally before any early return.
   const { state } = useWorkspace();
@@ -178,17 +180,27 @@ export function Home({ role }: { role: Role }) {
           <ArrowRight />
         </Go>
       </PageHeading>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         {stats.map((s) => (
-          <Panel key={s.label} title={s.label}>
-            <div className="flex items-center justify-between">
-              <p className="text-4xl font-semibold tracking-tight">{s.value}</p>
-              <s.icon className="size-6 text-muted-foreground" />
+          <Link
+            key={s.label}
+            href={href(role, s.path)}
+            className="group rounded-xl border border-border/70 bg-card p-4 sm:p-5 transition-colors hover:border-primary/50 focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                {s.label}
+              </p>
+              <s.icon className="size-4 text-muted-foreground" />
             </div>
-            <Go to={href(role, s.path)} secondary>
-              View details
-            </Go>
-          </Panel>
+            <p className="mt-4 text-3xl font-bold tracking-tight tabular-nums">
+              {s.value}
+            </p>
+            <p className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+              View details{" "}
+              <ArrowRight className="size-3 transition-transform group-hover:translate-x-1" />
+            </p>
+          </Link>
         ))}
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
@@ -196,76 +208,17 @@ export function Home({ role }: { role: Role }) {
           title={
             role === "sys-admin"
               ? "Access overview"
-              : personal(role)
-                ? "Your participation summary"
-                : "Participation overview"
+              : role === "operations"
+                ? "Referral coordination"
+                : role === "physiotherapist"
+                  ? "Screening workload"
+                  : personal(role)
+                    ? "Your participation summary"
+                    : "Participation overview"
           }
           description="Derived from the current demo records."
         >
-          {role === "sys-admin" ? (
-            <DataList
-              label="users"
-              rows={state.records.users.slice(0, 4).map((u) => ({
-                id: u.id,
-                name: u.title,
-                status: u.status,
-                detail: u.assigned,
-                to: href(role, "users"),
-              }))}
-            />
-          ) : (
-            <>
-              <div
-                className="space-y-4"
-                role="img"
-                aria-label="Participation distribution"
-              >
-                {[
-                  {
-                    label: "Cleared",
-                    count: athletes.filter(
-                      (a) => a.eligibilityStatus === "cleared",
-                    ).length,
-                  },
-                  {
-                    label: "Monitoring / restrictions",
-                    count: athletes.filter((a) =>
-                      [
-                        "cleared_with_monitoring",
-                        "sport_specific_restriction",
-                      ].includes(a.eligibilityStatus),
-                    ).length,
-                  },
-                  {
-                    label: "Pending / not cleared",
-                    count: athletes.filter((a) =>
-                      [
-                        "pending_evaluation",
-                        "temporarily_not_cleared",
-                        "not_cleared",
-                      ].includes(a.eligibilityStatus),
-                    ).length,
-                  },
-                ].map((s) => (
-                  <div key={s.label}>
-                    <div className="mb-2 flex justify-between text-sm">
-                      <span>{s.label}</span>
-                      <span>{s.count}</span>
-                    </div>
-                    <Progress
-                      value={
-                        athletes.length ? (s.count / athletes.length) * 100 : 0
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Eligibility comes from clinician decisions. AI movement risk is
-                not included in this chart.
-              </p>
-            </>
-          )}
+          <OverviewVisual role={role} />
         </Panel>
         <Panel
           title="Needs attention"
@@ -273,7 +226,7 @@ export function Home({ role }: { role: Role }) {
         >
           {notices.slice(0, 3).map((n) => (
             <div
-              className="flex items-start justify-between gap-3 rounded-xl bg-muted/60 p-3"
+              className="flex items-start justify-between gap-3 border-b border-border/50 pb-4"
               key={n.id}
             >
               <div>
@@ -298,6 +251,7 @@ export function Home({ role }: { role: Role }) {
           </Go>
         </Panel>
       </div>
+      {role === "physiotherapist" && <RehabilitationVisual role={role} />}
       <div className="grid gap-6 lg:grid-cols-2">
         <Panel
           title={

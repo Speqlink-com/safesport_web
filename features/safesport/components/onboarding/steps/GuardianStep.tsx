@@ -44,7 +44,7 @@ export function GuardianStep({ data, onUpdate }: GuardianStepProps) {
             <div className="space-y-2">
               <h2 className="text-xl font-semibold">Guardian information not required</h2>
               <p className="text-sm text-muted-foreground">
-                Since you are {data.profile.age || "over 18"} years old, you don't need to provide guardian information.
+                Since you are {data.profile.age || "over 18"} years old, you don&apos;t need to provide guardian information.
               </p>
               <Badge variant="outline" className="mt-2">
                 Not applicable

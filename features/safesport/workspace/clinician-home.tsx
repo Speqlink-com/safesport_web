@@ -13,45 +13,40 @@
  *   5. Two-column    — Upcoming care events · Recent activity
  */
 
-import Link from "next/link";
-import {
-  Users,
-  ShieldCheck,
-  ArrowRightLeft,
-  CalendarDays,
-  TriangleAlert,
-  ClipboardList,
-  ArrowRight,
-  RefreshCw,
-  CheckCircle2,
-  Clock,
-  AlertCircle,
-  BrainCircuit,
-  ChevronRight,
-  Stethoscope,
-} from "lucide-react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { identities, href } from "./catalog";
 import {
-  useWorkspace,
-  visibleAthletes,
-  fullName,
-  today,
-} from "./store";
+  AlertCircle,
+  ArrowRight,
+  ArrowRightLeft,
+  BrainCircuit,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
+  Clock,
+  RefreshCw,
+  ShieldCheck,
+  Stethoscope,
+  TriangleAlert,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { href, identities } from "./catalog";
 import { scopedRecords } from "./records";
+import { fullName, today, useWorkspace, visibleAthletes } from "./store";
 
 // ── Tiny design primitives ────────────────────────────────────────────────────
 
@@ -148,7 +143,14 @@ interface KpiProps {
   to: string;
 }
 
-function KpiCard({ label, value, sub, icon: Icon, accent = "neutral", to }: KpiProps) {
+function KpiCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  accent = "neutral",
+  to,
+}: KpiProps) {
   const accentMap = {
     green: "text-emerald-500",
     amber: "text-amber-500",
@@ -202,7 +204,14 @@ interface PriorityItemProps {
   to: string;
 }
 
-function PriorityItem({ icon: Icon, iconColor, title, sub, badge, to }: PriorityItemProps) {
+function PriorityItem({
+  icon: Icon,
+  iconColor,
+  title,
+  sub,
+  badge,
+  to,
+}: PriorityItemProps) {
   return (
     <Link
       href={to}
@@ -248,7 +257,20 @@ function EventRow({
     try {
       const [datePart, timePart] = d.includes("T") ? d.split("T") : [d, ""];
       const [, m, day] = datePart.split("-");
-      const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+      const months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+      ];
       const label = `${parseInt(day, 10)} ${months[parseInt(m, 10) - 1]}`;
       return timePart ? `${label} · ${timePart.slice(0, 5)}` : label;
     } catch {
@@ -285,10 +307,21 @@ function EventRow({
 
 // ── Activity row ──────────────────────────────────────────────────────────────
 
-function ActivityRow({ title, actor, date }: { title: string; actor: string; date: string }) {
+function ActivityRow({
+  title,
+  actor,
+  date,
+}: {
+  title: string;
+  actor: string;
+  date: string;
+}) {
   return (
     <div className="flex items-start gap-3 px-3 py-2.5">
-      <div className="mt-1 size-1.5 shrink-0 rounded-full bg-primary/60" aria-hidden="true" />
+      <div
+        className="mt-1 size-1.5 shrink-0 rounded-full bg-primary/60"
+        aria-hidden="true"
+      />
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-snug">{title}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
@@ -348,20 +381,26 @@ export function ClinicianHome() {
   );
   const notices = state.notices.filter((n) => n.role === role && !n.read);
   const user = state.accounts[role]?.name || identities[role].name;
-  const firstName = user.split(" ")[0] === "Dr"
-    ? user.split(" ").slice(0, 2).join(" ")
-    : user.split(" ")[0];
+  const firstName =
+    user.split(" ")[0] === "Dr"
+      ? user.split(" ").slice(0, 2).join(" ")
+      : user.split(" ")[0];
 
   // KPI values
-  const openReferrals = referrals.filter((r) => r.status !== "completed").length;
-  const aiPending = screenings.filter((s) => s.status === "ready_for_review").length;
+  const openReferrals = referrals.filter(
+    (r) => r.status !== "completed",
+  ).length;
+  const aiPending = screenings.filter(
+    (s) => s.status === "ready_for_review",
+  ).length;
   const incompleteEncounters = encounters.filter((e) => !e.finalized).length;
   const upcomingCount = events.length;
   const totalEncounters = encounters.length;
   const finalizedCount = encounters.filter((e) => e.finalized).length;
-  const ppeProgress = totalEncounters > 0
-    ? Math.round((finalizedCount / totalEncounters) * 100)
-    : 0;
+  const ppeProgress =
+    totalEncounters > 0
+      ? Math.round((finalizedCount / totalEncounters) * 100)
+      : 0;
 
   // ── Chart data ──────────────────────────────────────────────────────────────
 
@@ -399,10 +438,22 @@ export function ClinicianHome() {
 
   // 2. PPE completion bar (per assessment stage)
   const ppeStages = [
-    { stage: "Consent", count: encounters.filter((e) => e.vitals && Object.keys(e.vitals).length > 0 || e.reviewed).length },
+    {
+      stage: "Consent",
+      count: encounters.filter(
+        (e) => (e.vitals && Object.keys(e.vitals).length > 0) || e.reviewed,
+      ).length,
+    },
     { stage: "History", count: encounters.filter((e) => e.reviewed).length },
-    { stage: "Exam", count: encounters.filter((e) => Object.keys(e.exam).length > 0).length },
-    { stage: "Baseline", count: encounters.filter((e) => Object.keys(e.baseline).length > 0).length },
+    {
+      stage: "Exam",
+      count: encounters.filter((e) => Object.keys(e.exam).length > 0).length,
+    },
+    {
+      stage: "Baseline",
+      count: encounters.filter((e) => Object.keys(e.baseline).length > 0)
+        .length,
+    },
     { stage: "Complete", count: encounters.filter((e) => e.finalized).length },
   ];
 
@@ -536,7 +587,11 @@ export function ClinicianHome() {
         iconColor: "bg-red-500/10 text-red-600 dark:text-red-400",
         title: `Incident — ${athlete ? fullName(athlete) : i.athleteId}`,
         sub: `${i.kind?.replaceAll("_", " ") || "Incident"} · ${i.urgency || "moderate"} severity · ${i.date?.slice(0, 10)}`,
-        badge: <UrgencyBadge urgency={i.urgency === "moderate" ? "priority" : i.urgency} />,
+        badge: (
+          <UrgencyBadge
+            urgency={i.urgency === "moderate" ? "priority" : i.urgency}
+          />
+        ),
         to: href(role, `incidents/${i.id}`),
       });
     });
@@ -545,7 +600,6 @@ export function ClinicianHome() {
 
   return (
     <div className="space-y-8">
-
       {/* ── 1. HERO HEADER ──────────────────────────────────────────── */}
       <div className="relative overflow-hidden rounded-2xl border bg-card">
         {/* Subtle gradient accent */}
@@ -623,7 +677,9 @@ export function ClinicianHome() {
                   </span>{" "}
                   assessments finalised
                 </span>
-                <span className="font-semibold text-foreground">{ppeProgress}%</span>
+                <span className="font-semibold text-foreground">
+                  {ppeProgress}%
+                </span>
               </div>
               <Progress value={ppeProgress} className="h-1.5" />
             </div>
@@ -632,7 +688,7 @@ export function ClinicianHome() {
       </div>
 
       {/* ── 2. KPI STRIP ────────────────────────────────────────────── */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
         <KpiCard
           label="Athletes in scope"
           value={athletes.length}
@@ -643,11 +699,14 @@ export function ClinicianHome() {
         />
         <KpiCard
           label="Cleared for participation"
-          value={athletes.filter((a) => a.eligibilityStatus === "cleared").length}
+          value={
+            athletes.filter((a) => a.eligibilityStatus === "cleared").length
+          }
           sub={
             athletes.length
               ? `${Math.round(
-                  (athletes.filter((a) => a.eligibilityStatus === "cleared").length /
+                  (athletes.filter((a) => a.eligibilityStatus === "cleared")
+                    .length /
                     athletes.length) *
                     100,
                 )}% of athletes`
@@ -662,7 +721,11 @@ export function ClinicianHome() {
           value={openReferrals}
           sub={`${referrals.filter((r) => r.status === "overdue").length} overdue`}
           icon={ArrowRightLeft}
-          accent={referrals.filter((r) => r.status === "overdue").length > 0 ? "red" : "amber"}
+          accent={
+            referrals.filter((r) => r.status === "overdue").length > 0
+              ? "red"
+              : "amber"
+          }
           to={href(role, "referrals")}
         />
         <KpiCard
@@ -677,9 +740,8 @@ export function ClinicianHome() {
 
       {/* ── 3. CHARTS ROW ───────────────────────────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-3">
-
         {/* 3a. Eligibility distribution donut */}
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+        <div className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5">
           <div className="space-y-0.5">
             <SectionLabel>Athlete eligibility</SectionLabel>
             <p className="text-sm font-semibold">Status distribution</p>
@@ -691,7 +753,11 @@ export function ClinicianHome() {
           {eligibilityGroups.length > 0 ? (
             <>
               <div className="h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  initialDimension={{ width: 320, height: 180 }}
+                  width="100%"
+                  height="100%"
+                >
                   <PieChart>
                     <Pie
                       data={eligibilityGroups}
@@ -713,7 +779,10 @@ export function ClinicianHome() {
               </div>
               <div className="space-y-1.5">
                 {eligibilityGroups.map((g) => (
-                  <div key={g.name} className="flex items-center justify-between text-xs">
+                  <div
+                    key={g.name}
+                    className="flex items-center justify-between text-xs"
+                  >
                     <div className="flex items-center gap-2">
                       <span
                         className="size-2 rounded-full shrink-0"
@@ -722,7 +791,9 @@ export function ClinicianHome() {
                       />
                       <span className="text-muted-foreground">{g.name}</span>
                     </div>
-                    <span className="font-semibold tabular-nums">{g.value}</span>
+                    <span className="font-semibold tabular-nums">
+                      {g.value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -735,7 +806,7 @@ export function ClinicianHome() {
 
           <Link
             href={href(role, "eligibility")}
-            className="mt-auto flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
+            className="mt-auto flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-opacity hover:opacity-80"
           >
             View eligibility decisions
             <ChevronRight className="size-3" aria-hidden="true" />
@@ -743,10 +814,12 @@ export function ClinicianHome() {
         </div>
 
         {/* 3b. PPE stages bar */}
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+        <div className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5">
           <div className="space-y-0.5">
             <SectionLabel>PPE pipeline</SectionLabel>
-            <p className="text-sm font-semibold">Assessment completion by stage</p>
+            <p className="text-sm font-semibold">
+              Assessment completion by stage
+            </p>
             <p className="text-xs text-muted-foreground">
               Counts across all active encounters
             </p>
@@ -754,7 +827,11 @@ export function ClinicianHome() {
 
           {totalEncounters > 0 ? (
             <div className="h-[180px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer
+                initialDimension={{ width: 320, height: 180 }}
+                width="100%"
+                height="100%"
+              >
                 <BarChart
                   data={ppeStages}
                   margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
@@ -778,7 +855,10 @@ export function ClinicianHome() {
                     axisLine={false}
                     tickLine={false}
                   />
-                  <Tooltip content={<ChartTip />} cursor={{ fill: "currentColor", fillOpacity: 0.04 }} />
+                  <Tooltip
+                    content={<ChartTip />}
+                    cursor={{ fill: "currentColor", fillOpacity: 0.04 }}
+                  />
                   <Bar
                     dataKey="count"
                     name="Athletes"
@@ -797,7 +877,7 @@ export function ClinicianHome() {
 
           <Link
             href={href(role, "assessments")}
-            className="mt-auto flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
+            className="mt-auto flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-opacity hover:opacity-80"
           >
             Open PPE assessments
             <ChevronRight className="size-3" aria-hidden="true" />
@@ -805,7 +885,7 @@ export function ClinicianHome() {
         </div>
 
         {/* 3c. Referral urgency */}
-        <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+        <div className="flex min-w-0 flex-col gap-4 rounded-xl border bg-card p-5">
           <div className="space-y-0.5">
             <SectionLabel>Referral urgency</SectionLabel>
             <p className="text-sm font-semibold">Open referrals by priority</p>
@@ -817,7 +897,11 @@ export function ClinicianHome() {
           {urgencyData.length > 0 ? (
             <>
               <div className="h-[180px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainer
+                  initialDimension={{ width: 320, height: 180 }}
+                  width="100%"
+                  height="100%"
+                >
                   <BarChart
                     data={urgencyData}
                     margin={{ top: 4, right: 8, left: -20, bottom: 0 }}
@@ -831,24 +915,35 @@ export function ClinicianHome() {
                     />
                     <XAxis
                       dataKey="urgency"
-                      tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+                      tick={{
+                        fontSize: 10,
+                        fill: "currentColor",
+                        opacity: 0.5,
+                      }}
                       axisLine={false}
                       tickLine={false}
                     />
                     <YAxis
                       allowDecimals={false}
-                      tick={{ fontSize: 10, fill: "currentColor", opacity: 0.5 }}
+                      tick={{
+                        fontSize: 10,
+                        fill: "currentColor",
+                        opacity: 0.5,
+                      }}
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ChartTip />} cursor={{ fill: "currentColor", fillOpacity: 0.04 }} />
-                    <Bar
-                      dataKey="count"
-                      name="Referrals"
-                      radius={[4, 4, 0, 0]}
-                    >
+                    <Tooltip
+                      content={<ChartTip />}
+                      cursor={{ fill: "currentColor", fillOpacity: 0.04 }}
+                    />
+                    <Bar dataKey="count" name="Referrals" radius={[4, 4, 0, 0]}>
                       {urgencyData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} fillOpacity={0.85} />
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.color}
+                          fillOpacity={0.85}
+                        />
                       ))}
                     </Bar>
                   </BarChart>
@@ -856,14 +951,19 @@ export function ClinicianHome() {
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                 {urgencyData.map((d) => (
-                  <div key={d.urgency} className="flex items-center gap-1.5 text-xs">
+                  <div
+                    key={d.urgency}
+                    className="flex items-center gap-1.5 text-xs"
+                  >
                     <span
                       className="size-2 rounded-full shrink-0"
                       style={{ background: d.color }}
                       aria-hidden="true"
                     />
                     <span className="text-muted-foreground">{d.urgency}</span>
-                    <span className="ml-auto font-semibold tabular-nums">{d.count}</span>
+                    <span className="ml-auto font-semibold tabular-nums">
+                      {d.count}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -876,7 +976,7 @@ export function ClinicianHome() {
 
           <Link
             href={href(role, "referrals")}
-            className="mt-auto flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
+            className="mt-auto flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-opacity hover:opacity-80"
           >
             View all referrals
             <ChevronRight className="size-3" aria-hidden="true" />
@@ -886,12 +986,10 @@ export function ClinicianHome() {
 
       {/* ── 4. PRIORITY QUEUE ───────────────────────────────────────── */}
       <div className="rounded-xl border bg-card">
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
           <div className="space-y-0.5">
             <SectionLabel>Needs attention</SectionLabel>
-            <p className="text-sm font-semibold">
-              Priority actions for today
-            </p>
+            <p className="text-sm font-semibold">Priority actions for today</p>
           </div>
           {priorityItems.length > 0 && (
             <Link
@@ -913,7 +1011,10 @@ export function ClinicianHome() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2 py-10 text-center">
-            <CheckCircle2 className="size-8 text-primary/60" aria-hidden="true" />
+            <CheckCircle2
+              className="size-8 text-primary/60"
+              aria-hidden="true"
+            />
             <p className="text-sm font-medium">All clear</p>
             <p className="max-w-xs text-xs text-muted-foreground">
               No priority actions right now. New items appear here as the care
@@ -925,10 +1026,9 @@ export function ClinicianHome() {
 
       {/* ── 5. UPCOMING CARE + RECENT ACTIVITY ─────────────────────── */}
       <div className="grid gap-5 lg:grid-cols-2">
-
         {/* Upcoming care events */}
-        <div className="flex flex-col rounded-xl border bg-card">
-          <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex min-w-0 flex-col rounded-xl border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div className="space-y-0.5">
               <SectionLabel>Schedule</SectionLabel>
               <p className="text-sm font-semibold">Upcoming care</p>
@@ -964,7 +1064,10 @@ export function ClinicianHome() {
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <CalendarDays className="size-7 text-muted-foreground/40" aria-hidden="true" />
+              <CalendarDays
+                className="size-7 text-muted-foreground/40"
+                aria-hidden="true"
+              />
               <p className="text-sm text-muted-foreground">
                 No upcoming appointments scheduled.
               </p>
@@ -983,13 +1086,16 @@ export function ClinicianHome() {
         </div>
 
         {/* Recent activity */}
-        <div className="flex flex-col rounded-xl border bg-card">
-          <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex min-w-0 flex-col rounded-xl border bg-card">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
             <div className="space-y-0.5">
               <SectionLabel>Activity</SectionLabel>
               <p className="text-sm font-semibold">Recent workspace events</p>
             </div>
-            <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Clock
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
           </div>
           <Divider />
 
@@ -1006,7 +1112,10 @@ export function ClinicianHome() {
             </div>
           ) : (
             <div className="flex flex-col items-center gap-2 py-8 text-center">
-              <RefreshCw className="size-7 text-muted-foreground/40" aria-hidden="true" />
+              <RefreshCw
+                className="size-7 text-muted-foreground/40"
+                aria-hidden="true"
+              />
               <p className="text-sm text-muted-foreground">
                 No recent activity recorded yet.
               </p>
@@ -1042,7 +1151,7 @@ export function ClinicianHome() {
                 {athletes.length > 5 && (
                   <Link
                     href={href(role, "athletes")}
-                    className="mt-2 flex items-center gap-1 text-xs font-medium text-primary transition-opacity hover:opacity-80"
+                    className="mt-2 flex items-center gap-1 text-xs font-medium text-emerald-700 dark:text-emerald-400 transition-opacity hover:opacity-80"
                   >
                     + {athletes.length - 5} more athletes
                     <ChevronRight className="size-3" aria-hidden="true" />
@@ -1053,7 +1162,6 @@ export function ClinicianHome() {
           )}
         </div>
       </div>
-
     </div>
   );
 }

@@ -1,11 +1,12 @@
 "use client"
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { XIcon, SendIcon, FileIcon } from "lucide-react"
-import type { Attachment } from "../../types/messaging"
+import Image from "next/image";
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { XIcon, SendIcon, FileIcon } from "lucide-react";
+
 
 interface AttachmentPreviewProps {
   files: File[]
@@ -23,7 +24,7 @@ export function AttachmentPreview({ files, type, onSend, onCancel }: AttachmentP
     if (type === "image") {
       return (
         <div key={index} className="relative rounded-lg overflow-hidden bg-muted">
-          <img
+          <Image width={640} height={480} unoptimized
             src={url}
             alt={file.name}
             className="w-full h-48 object-contain"

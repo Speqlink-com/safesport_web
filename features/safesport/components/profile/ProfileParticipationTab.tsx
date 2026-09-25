@@ -3,12 +3,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import {
-  BuildingIcon,
-  UsersIcon,
-  TrophyIcon,
-  CheckCircle2Icon,
-} from "lucide-react";
+import { BuildingIcon, UsersIcon, TrophyIcon, CheckCircle2Icon } from "lucide-react";
 import type { Athlete } from "@/features/safesport/types";
 
 interface ProfileParticipationTabProps {
@@ -119,7 +114,7 @@ export function ProfileParticipationTab({
 
         {athlete.organizations && athlete.organizations.length > 1 ? (
           <div className="space-y-3">
-            {athlete.organizations.slice(1).map((org, index) => (
+            {athlete.organizations.slice(1).map((org) => (
               <div
                 key={org.organizationId}
                 className="flex items-start gap-3 p-3 rounded-lg border"
@@ -163,7 +158,7 @@ export function ProfileParticipationTab({
 
         {athlete.teams && athlete.teams.length > 0 ? (
           <div className="space-y-3">
-            {athlete.teams.map((team, index) => (
+            {athlete.teams.map((team) => (
               <div
                 key={team.teamId}
                 className="flex items-start gap-3 p-3 rounded-lg border"

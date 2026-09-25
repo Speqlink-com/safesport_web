@@ -76,12 +76,12 @@ export const NotificationStore = {
 // ==================================================
 
 export function useNotifications(role: SafeSportRole, filters?: NotificationFilters) {
-  const [, forceUpdate] = useState({});
+  const [, forceUpdate] = useState(0);
 
   // Subscribe to notification changes
   useEffect(() => {
     const unsubscribe = NotificationStore.subscribe(() => {
-      forceUpdate({});
+      forceUpdate(v => v + 1);
     });
     return () => {
       unsubscribe();
@@ -89,10 +89,7 @@ export function useNotifications(role: SafeSportRole, filters?: NotificationFilt
   }, []);
 
   // Get role-specific notifications
-  const allNotifications = useMemo(() => {
-    return NotificationStore.getByRole(role);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [role]);
+  const allNotifications = NotificationStore.getByRole(role);
 
   // Apply filters
   const filteredNotifications = useMemo(() => {

@@ -31,7 +31,7 @@ export function ParticipationStep({ data, onUpdate }: ParticipationStepProps) {
           <div>
             <h2 className="text-xl font-semibold mb-2">Confirm your sport details</h2>
             <p className="text-sm text-muted-foreground">
-              We have your participation information from signup. Let's make sure everything is correct.
+              We have your participation information from signup. Let&apos;s make sure everything is correct.
             </p>
           </div>
 

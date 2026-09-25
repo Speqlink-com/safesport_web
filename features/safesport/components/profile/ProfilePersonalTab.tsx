@@ -1,22 +1,16 @@
 "use client"
 
-import { useState } from "react"
-import { Card } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { EditIcon, CheckIcon, XIcon } from "lucide-react"
-import type { Athlete } from "@/features/safesport/types"
-import type { AthleteOnboardingData } from "@/features/safesport/types/onboarding"
+import { useState } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { EditIcon, CheckIcon, XIcon } from "lucide-react";
+import type { Athlete } from "@/features/safesport/types";
+import type { AthleteOnboardingData } from "@/features/safesport/types/onboarding";
 
 interface ProfilePersonalTabProps {
   athlete: Athlete
@@ -298,7 +292,7 @@ export function ProfilePersonalTab({ athlete, onboardingData }: ProfilePersonalT
             <Separator className="mb-4" />
 
             <div className="space-y-4">
-              {athlete.guardians.map((guardian, index) => (
+              {athlete.guardians.map((guardian) => (
                 <div key={guardian.id} className="p-4 rounded-lg bg-muted/50">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>

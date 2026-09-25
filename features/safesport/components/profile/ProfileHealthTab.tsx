@@ -5,18 +5,11 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import {
-  CheckCircle2Icon,
-  CircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-} from "lucide-react";
+import { CheckCircle2Icon, CircleIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { Athlete } from "@/features/safesport/types";
-import type {
-  AthleteOnboardingData,
-  OnboardingStepId,
-} from "@/features/safesport/types/onboarding";
+import type { AthleteOnboardingData, OnboardingStepId } from "@/features/safesport/types/onboarding";
 
+// Import step components
 // Import step components
 import { ProfileStep } from "@/features/safesport/components/onboarding/steps/ProfileStep";
 import { EmergencyContactStep } from "@/features/safesport/components/onboarding/steps/EmergencyContactStep";
@@ -42,10 +35,9 @@ export function ProfileHealthTab({
   athlete,
   onboardingData,
 }: ProfileHealthTabProps) {
-  if (!onboardingData) {
-    return <div>Loading...</div>;
-  }
-
+  return onboardingData ? <ProfileHealthContent athlete={athlete} onboardingData={onboardingData} /> : <div role="status">Loading health profile…</div>;
+}
+function ProfileHealthContent({onboardingData}: {athlete: Athlete; onboardingData: AthleteOnboardingData}) {
   const [formData, setFormData] = useState(onboardingData);
   const [currentSectionIndex, setCurrentSectionIndex] = useState(() => {
     // Find first incomplete section
@@ -138,10 +130,6 @@ export function ProfileHealthTab({
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSave = () => {
-    console.log("Saving profile data:", formData);
-    // In production: API call to save progress
-  };
 
   const renderSection = () => {
     const commonProps = {

@@ -1,15 +1,9 @@
 // SafeSport™ Mock Onboarding Data
 // Realistic athlete onboarding states for prototype testing
 
-import type {
-  AthleteOnboardingData,
-  OnboardingState,
-  PPEReadiness,
-  EmergencyContact,
-  GuardianInfo,
-  HealthQuestionnaire,
-  ConsentStatus,
-} from "../types/onboarding";
+// SafeSport™ Mock Onboarding Data
+// Realistic athlete onboarding states for prototype testing
+import type { AthleteOnboardingData, PPEReadiness } from "../types/onboarding";
 
 // ==================================================
 // BRIAN OTIENO - MOSTLY COMPLETE

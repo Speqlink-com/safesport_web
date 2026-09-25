@@ -1,5 +1,4 @@
-import { ResetPasswordForm } from "@/features/auth/components";
-
-export default function ResetPasswordPage() {
-  return <ResetPasswordForm />;
+import DemoAuth from "@/features/auth/components/DemoAuth";
+export default function Page() {
+  return <DemoAuth />;
 }

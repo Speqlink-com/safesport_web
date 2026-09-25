@@ -37,7 +37,7 @@ export function ReadyStep({ data }: ReadyStepProps) {
           </div>
 
           <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">You're ready, {firstName}!</h2>
+            <h2 className="text-2xl font-semibold">You&apos;re ready, {firstName}!</h2>
             <p className="text-sm text-muted-foreground max-w-lg mx-auto">
               Your profile and pre-assessment information are complete. Your clinician will review your information and complete your physical assessment.
             </p>
@@ -55,7 +55,7 @@ export function ReadyStep({ data }: ReadyStepProps) {
           <div>
             <h3 className="text-lg font-semibold mb-2">What happens next?</h3>
             <p className="text-sm text-muted-foreground">
-              Your athlete onboarding is complete. Here's what to expect for your clinical assessment:
+              Your athlete onboarding is complete. Here&apos;s what to expect for your clinical assessment:
             </p>
           </div>
 
@@ -67,7 +67,7 @@ export function ReadyStep({ data }: ReadyStepProps) {
               <div className="space-y-1">
                 <p className="font-medium">Scheduling</p>
                 <p className="text-sm text-muted-foreground">
-                  Your institution will schedule your clinical assessment. You'll receive a notification with the date and time.
+                  Your institution will schedule your clinical assessment. You&apos;ll receive a notification with the date and time.
                 </p>
               </div>
             </div>

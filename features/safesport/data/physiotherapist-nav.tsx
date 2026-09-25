@@ -1,15 +1,7 @@
 // Physiotherapist Navigation Configuration for SafeSport™
 
-import {
-  ClipboardListIcon,
-  TrendingUpIcon,
-  HeartPulseIcon,
-  ArrowRightLeftIcon,
-  UsersIcon,
-  FileTextIcon,
-  BellIcon,
-  MessageSquareIcon,
-} from "lucide-react";
+// Physiotherapist Navigation Configuration for SafeSport™
+import { ClipboardListIcon, TrendingUpIcon, HeartPulseIcon, ArrowRightLeftIcon, BellIcon, MessageSquareIcon } from "lucide-react";
 
 export const physiotherapistNavData = {
   user: {

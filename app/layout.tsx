@@ -3,6 +3,7 @@ import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Theme_Provider from "@/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { WorkspaceProvider } from "@/features/safesport/workspace/store";
 import { Toaster } from "@/components/ui/sonner";
 
 const interSans = Inter({
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className={`${interSans.className} h-full flex flex-col bg-background`}
       >
         <Theme_Provider>
-          <TooltipProvider>{children}</TooltipProvider>
+          <WorkspaceProvider>
+            <TooltipProvider>{children}</TooltipProvider>
+          </WorkspaceProvider>
           <Toaster />
         </Theme_Provider>
       </body>

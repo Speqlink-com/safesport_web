@@ -1,20 +1,9 @@
 // SafeSport™ Mock Data Repository
 // Shared consistent mock data for prototype - same athletes across all roles
 
-import type {
-  Athlete,
-  Organization,
-  Team,
-  Sport,
-  PPEAssessment,
-  Incident,
-  MovementScreening,
-  Referral,
-  ScheduleEvent,
-  Notification,
-  TimelineEvent,
-  EligibilityDecision,
-} from "../types";
+// SafeSport™ Mock Data Repository
+// Shared consistent mock data for prototype - same athletes across all roles
+import type { Athlete, Organization, Team, Sport, PPEAssessment, Incident, MovementScreening, Referral, ScheduleEvent, Notification } from "../types";
 
 // ==================================================
 // ORGANIZATIONS

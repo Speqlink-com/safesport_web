@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -25,6 +26,7 @@ export function ProfileOverviewTab({
   athlete,
   onboardingData,
 }: ProfileOverviewTabProps) {
+  const router = useRouter();
   const profileComplete = onboardingData?.progress.isComplete ?? true;
   const profileCompletion = onboardingData?.progress.overall ?? 100;
 
@@ -134,8 +136,7 @@ export function ProfileOverviewTab({
                 size="sm"
                 className="w-full"
                 onClick={() =>
-                  (window.location.href =
-                    "/safesport/athlete/profile?tab=health")
+                  router.push("/safesport/athlete/profile?tab=health")
                 }
               >
                 Continue setup
@@ -285,8 +286,7 @@ export function ProfileOverviewTab({
               </p>
               <Button
                 onClick={() =>
-                  (window.location.href =
-                    "/safesport/athlete/profile?tab=health")
+                  router.push("/safesport/athlete/profile?tab=health")
                 }
               >
                 Complete profile
@@ -317,7 +317,7 @@ export function ProfileOverviewTab({
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  (window.location.href = "/safesport/athlete/screenings")
+                  router.push("/safesport/athlete/screenings")
                 }
               >
                 View
@@ -343,7 +343,7 @@ export function ProfileOverviewTab({
                 variant="ghost"
                 size="sm"
                 onClick={() =>
-                  (window.location.href = "/safesport/athlete/health")
+                  router.push("/safesport/athlete/health")
                 }
               >
                 View

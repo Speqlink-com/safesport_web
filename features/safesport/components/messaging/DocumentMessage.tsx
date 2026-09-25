@@ -1,13 +1,9 @@
 "use client"
 
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { 
-  FileTextIcon, 
-  DownloadIcon,
-  Loader2Icon
-} from "lucide-react"
-import type { Attachment } from "../../types/messaging"
+
+import { Card } from "@/components/ui/card";
+import { FileTextIcon, DownloadIcon, Loader2Icon } from "lucide-react";
+import type { Attachment } from "../../types/messaging";
 
 interface DocumentMessageProps {
   attachment: Attachment
@@ -16,8 +12,6 @@ interface DocumentMessageProps {
 
 export function DocumentMessage({ attachment, isCurrentUser }: DocumentMessageProps) {
   const getFileIcon = () => {
-    const type = attachment.fileType.toLowerCase()
-    const fileName = attachment.fileName.toLowerCase()
 
     // All documents get the same PDF-style icon for consistency
     return <FileTextIcon className="size-10 text-white" />

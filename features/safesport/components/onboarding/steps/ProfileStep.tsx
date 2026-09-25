@@ -42,9 +42,9 @@ export function ProfileStep({ data, onUpdate }: ProfileStepProps) {
       <Card className="p-6">
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold mb-2">Let's complete your athlete profile</h2>
+            <h2 className="text-xl font-semibold mb-2">Let&apos;s complete your athlete profile</h2>
             <p className="text-sm text-muted-foreground">
-              We already have some information from your signup. Let's fill in a few more details.
+              We already have some information from your signup. Let&apos;s fill in a few more details.
             </p>
           </div>
 

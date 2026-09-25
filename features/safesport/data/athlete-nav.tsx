@@ -1,18 +1,7 @@
 // Athlete Navigation Configuration for SafeSport™
 
-import {
-  UserIcon,
-  ActivityIcon,
-  HeartPulseIcon,
-  TrophyIcon,
-  FileTextIcon,
-  AwardIcon,
-  BellIcon,
-  MessageSquareIcon,
-  ClipboardCheckIcon,
-  TrendingUpIcon,
-  UsersIcon,
-} from "lucide-react";
+// Athlete Navigation Configuration for SafeSport™
+import { UserIcon, HeartPulseIcon, FileTextIcon, AwardIcon, BellIcon, MessageSquareIcon } from "lucide-react";
 
 export const athleteNavData = {
   user: {

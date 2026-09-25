@@ -36,7 +36,7 @@ export function EmergencyContactStep({ data, onUpdate }: EmergencyContactStepPro
       <Card className="p-6">
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold mb-2">Let's make sure we can reach someone if needed</h2>
+            <h2 className="text-xl font-semibold mb-2">Let&apos;s make sure we can reach someone if needed</h2>
             <p className="text-sm text-muted-foreground">
               Who should we contact in case of an emergency during training or competition?
             </p>

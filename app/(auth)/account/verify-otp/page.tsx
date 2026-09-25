@@ -1,5 +1,4 @@
-import { VerifyOTPForm } from "@/features/auth/components";
-
-export default function VerifyOTPPage() {
-  return <VerifyOTPForm />;
+import DemoAuth from "@/features/auth/components/DemoAuth";
+export default function Page() {
+  return <DemoAuth />;
 }

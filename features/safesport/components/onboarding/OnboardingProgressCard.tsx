@@ -29,7 +29,7 @@ export function OnboardingProgressCard({ data, athleteName }: OnboardingProgress
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle2Icon className="size-5 text-primary" />
-              <h3 className="text-lg font-semibold">You're ready for your clinical assessment</h3>
+              <h3 className="text-lg font-semibold">You&apos;re ready for your clinical assessment</h3>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
               Your profile and pre-assessment information are complete. Your clinician will review your information and complete your physical assessment.

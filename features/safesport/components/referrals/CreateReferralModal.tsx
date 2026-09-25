@@ -72,7 +72,7 @@ export function CreateReferralModal({
 
     // Create referral object
     const newReferral = {
-      id: `ref-${Math.random().toString(36).substr(2, 9)}`,
+      id: `ref-${crypto.randomUUID().slice(0, 8)}`,
       athleteId,
       createdBy: "clin-001",
       createdByName: "Dr. Sarah Ndungu",

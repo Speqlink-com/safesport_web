@@ -1,16 +1,16 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { Button } from "@/components/ui/button"
-import { DownloadIcon, PlayIcon } from "lucide-react"
-import type { Attachment } from "../../types/messaging"
+import { useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { DownloadIcon, PlayIcon } from "lucide-react";
+import type { Attachment } from "../../types/messaging";
 
 interface VideoMessageProps {
   attachment: Attachment
   isCurrentUser?: boolean
 }
 
-export function VideoMessage({ attachment, isCurrentUser }: VideoMessageProps) {
+export function VideoMessage({ attachment }: VideoMessageProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [showControls, setShowControls] = useState(false)
 

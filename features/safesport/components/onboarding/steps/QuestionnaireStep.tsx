@@ -7,14 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AlertCircleIcon, HeartIcon, BrainIcon, ActivityIcon, AlertTriangleIcon } from "lucide-react";
-import type { AthleteOnboardingData, QuestionnaireResponse, QuestionnaireDomain } from "../../../types/onboarding";
+import type { AthleteOnboardingData, QuestionnaireResponse } from "../../../types/onboarding";
 
 interface QuestionnaireStepProps {
   data: AthleteOnboardingData;
@@ -57,11 +52,11 @@ export function QuestionnaireStep({ data }: QuestionnaireStepProps) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" aria-label={`Questionnaire for ${data.profile.firstName}`}>
       <Card className="p-6">
         <div className="space-y-6">
           <div>
-            <h2 className="text-xl font-semibold mb-2">Let's get to know your health</h2>
+            <h2 className="text-xl font-semibold mb-2">Let&apos;s get to know your health</h2>
             <p className="text-sm text-muted-foreground">
               These questions help your clinical team understand your history before your assessment.
               Answer honestly - positive responses help us keep you safe.
@@ -578,7 +573,7 @@ function QuestionCard({
           </div>
           <div className="flex items-center space-x-2">
             <RadioGroupItem value="unknown" id={`${id}-unknown`} />
-            <Label htmlFor={`${id}-unknown`} className="font-normal cursor-pointer">I'm not sure</Label>
+            <Label htmlFor={`${id}-unknown`} className="font-normal cursor-pointer">I&apos;m not sure</Label>
           </div>
         </RadioGroup>
       </div>
