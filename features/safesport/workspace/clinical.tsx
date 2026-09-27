@@ -588,6 +588,7 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
   const [form, setForm] = useState(initial);
   const [step, setStep] = useState(0);
   const [confirm, setConfirm] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const athlete = state.athletes.find((a) => a.id === form.athleteId)!;
   const consent = state.consents[athlete.id];
   const blocks = assessmentBlocks(form, consent);
@@ -610,13 +611,14 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
     "Eligibility",
   ];
   const patch = (v: Partial<Encounter>) => setForm({ ...form, ...v });
-  const save = async (finalized = false) => {
+  const save = async (finalized = false, label = "Assessment") => {
     const candidate = {
       ...form,
       finalized,
       status: finalized ? "complete" : "in_progress",
     };
     try {
+      setSavingDraft(true);
       const saved = (await (finalized
         ? ppeApi.finalizeAssessment(form.id, candidate as unknown as Record<string, unknown>)
         : ppeApi.saveAssessment(form.id, candidate as unknown as Record<string, unknown>))) as unknown as Encounter;
@@ -706,9 +708,11 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
       );
       setForm(saved);
       setConfirm(false);
-      toast.success(finalized ? "Clinical decision finalized" : "Assessment draft saved");
+      toast.success(finalized ? "Clinical decision finalized" : `${label} draft saved`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to save assessment");
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -755,16 +759,16 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
         title={`PPE · ${fullName(athlete)}`}
         description={`${form.id} • ${athlete.currentSport?.name} • ${form.date}`}
       >
-        <Button variant="outline" onClick={() => save()}>
-          Save draft
+        <Button variant="outline" disabled={savingDraft} onClick={() => save(false, "Assessment")}>
+          {savingDraft ? "Saving…" : "Save draft"}
         </Button>
         <Go to={href("clinician", `athletes/${athlete.id}`)} secondary>
           Close assessment
         </Go>
         <Button
           variant="outline"
-          onClick={() => {
-            save();
+          onClick={async () => {
+            await save(false, "Assessment");
             router.push(
               href(
                 "clinician",
@@ -809,6 +813,20 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
           title={stages[step]}
           description="Save your work before leaving the assessment."
         >
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 p-3">
+            <p className="text-sm text-muted-foreground">
+              Save this section before changing tasks, logging out, or closing the browser.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={savingDraft}
+              onClick={() => save(false, stages[step])}
+            >
+              {savingDraft ? "Saving…" : `Save ${stages[step]} draft`}
+            </Button>
+          </div>
           {step === 1 && (
             <>
               <p className="rounded-lg bg-muted p-3 text-sm">
@@ -1013,12 +1031,22 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
                   All required stages are documented.
                 </p>
               )}
-              <Button
-                disabled={blocks.length > 0}
-                onClick={() => setConfirm(true)}
-              >
-                Finalize clinician decision
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={savingDraft}
+                  onClick={() => save(false, stages[step])}
+                >
+                  {savingDraft ? "Saving…" : "Save eligibility draft"}
+                </Button>
+                <Button
+                  disabled={blocks.length > 0 || savingDraft}
+                  onClick={() => setConfirm(true)}
+                >
+                  Finalize clinician decision
+                </Button>
+              </div>
             </>
           )}
         </Panel>
