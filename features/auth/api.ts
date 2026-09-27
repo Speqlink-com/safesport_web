@@ -52,6 +52,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function downloadFile(path: string, filename: string): Promise<void> {
+  const response = await fetch(`${API_URL}${path}`, { credentials: "include" });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new AuthApiError(body?.detail ?? "Unable to download file", response.status);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
     request<{ detail: string }>("/auth/login", {
@@ -192,5 +207,8 @@ export const ppeApi = {
     request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}`, { method: "PUT", body: JSON.stringify(payload) }),
   finalizeAssessment: (assessmentId: string, payload: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}/finalize`, { method: "POST", body: JSON.stringify(payload) }),
+  downloadCertificate: (assessmentId: string, filename = `safesport-certificate-${assessmentId}.pdf`) =>
+    downloadFile(`/ppe/certificates/${assessmentId}`, filename),
   certificateUrl: (assessmentId: string) => `${API_URL}/ppe/certificates/${assessmentId}`,
+  verifyCertificateUrl: (code: string) => `${API_URL}/ppe/certificates/verify/${encodeURIComponent(code)}`,
 };

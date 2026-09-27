@@ -28,7 +28,6 @@ import {
   examDomains,
   baselineDomains,
   eligibilityOptions,
-  certificateText,
   type Encounter,
   type Consent,
 } from "./store";
@@ -43,7 +42,6 @@ import {
   Status,
   Go,
   DataList,
-  Export,
 } from "./ui";
 export function ConsentScreen({
   role,
@@ -743,10 +741,17 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
           <p className="text-sm text-muted-foreground">
             Signed by {form.signature} · Review {form.reviewDate}
           </p>
-          <Export
-            name={`${form.id}-certificate.txt`}
-            content={certificateText(athlete, form)}
-          />
+          <Button
+            variant="outline"
+            onClick={() =>
+              ppeApi.downloadCertificate(
+                form.id,
+                `safesport-certificate-${form.certificateCode || form.id}.pdf`,
+              )
+            }
+          >
+            Download PDF certificate
+          </Button>
           <Go to={href("clinician", `athletes/${athlete.id}`)} secondary>
             Athlete record
           </Go>
@@ -1134,10 +1139,17 @@ export function Eligibility({
                   <dt>Verification</dt>
                   <dd>{e.certificateCode || `SAFE-${e.id.slice(0, 8).toUpperCase()}`}</dd>
                 </dl>
-                <Export
-                  name={`${a.id}-certificate.txt`}
-                  content={certificateText(a, e)}
-                />
+                <Button
+                  variant="outline"
+                  onClick={() =>
+                    ppeApi.downloadCertificate(
+                      e.id,
+                      `safesport-certificate-${e.certificateCode || a.id}.pdf`,
+                    )
+                  }
+                >
+                  Download PDF certificate
+                </Button>
               </Panel>
             );
           })}

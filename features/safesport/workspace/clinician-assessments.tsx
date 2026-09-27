@@ -6,6 +6,7 @@
  */
 
 import { Button } from "@/components/ui/button";
+import { ppeApi } from "@/features/auth/api";
 import {
 Dialog,
 DialogContent,
@@ -43,7 +44,6 @@ StatusChip
 } from "./clinician-ui";
 import {
 baselineDomains,
-certificateText,
 eligibilityOptions,
 emptyEncounter,
 examDomains,
@@ -56,7 +56,7 @@ useWorkspace,
 visibleAthletes,
 type Encounter,
 } from "./store";
-import { Check,Choice,Export,Field,Notes } from "./ui";
+import { Check,Choice,Field,Notes } from "./ui";
 
 // ── Assessment list ───────────────────────────────────────────────────────────
 
@@ -304,7 +304,18 @@ function AssessmentDetail({ initial }: { initial: Encounter }) {
             { label: "Assessment date", value: form.date },
           ]} />
           <div className="mt-5 flex flex-wrap gap-2 border-t pt-5">
-            <Export name={`${form.id}-certificate.txt`} content={certificateText(athlete, form)} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                ppeApi.downloadCertificate(
+                  form.id,
+                  `safesport-certificate-${form.certificateCode || form.id}.pdf`,
+                )
+              }
+            >
+              Download PDF certificate
+            </Button>
             <Link href={href("clinician", `athletes/${athlete.id}`)}>
               <Button variant="outline" size="sm">Athlete record</Button>
             </Link>
