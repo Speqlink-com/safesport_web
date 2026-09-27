@@ -124,18 +124,35 @@ export function Messages({ role }: { role: Role }) {
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageItem | null>(null);
 
+  const mergeWorkspace = (payload: { current_user: MessageUser; people: MessageUser[]; conversations: ConversationItem[] }, keepActive = true) => {
+    setWorkspace(payload);
+    setActiveId((current) =>
+      keepActive && current && payload.conversations.some((conversation) => conversation.id === current)
+        ? current
+        : payload.conversations[0]?.id || "",
+    );
+  };
+
   useEffect(() => {
     let active = true;
     void messagingApi.workspace()
       .then((payload) => {
         if (!active) return;
-        setWorkspace(payload);
-        setActiveId(payload.conversations[0]?.id || "");
+        mergeWorkspace(payload, false);
       })
       .catch((error) => toast.error(error instanceof Error ? error.message : "Unable to load messages"));
     return () => {
       active = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void messagingApi.workspace()
+        .then((payload) => mergeWorkspace(payload))
+        .catch(() => undefined);
+    }, 3000);
+    return () => window.clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -229,7 +246,7 @@ export function Messages({ role }: { role: Role }) {
     <>
       <PageHeading
         title="Messages"
-        description="Institution-bounded realtime conversations. Clinicians, physiotherapists and system administrators can communicate across institutions."
+        description={globalMessaging ? "Realtime institution groups across all institutions." : "Institution-bounded realtime conversations with your institution and care team."}
       />
       <div className="grid min-h-[600px] gap-5 lg:grid-cols-[300px_1fr]">
         <Panel title="Conversations">
@@ -252,20 +269,22 @@ export function Messages({ role }: { role: Role }) {
               </Button>
             ))}
           </div>
-          <div className="mt-5 space-y-3 border-t pt-4">
-            <Input aria-label="Search contacts" placeholder="Search people…" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="max-h-72 space-y-2 overflow-y-auto">
-              {people.map((person) => (
-                <Button key={person.id} variant="outline" className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left" onClick={() => startDirect(person)}>
-                  <MessageSquare />
-                  <span>
-                    {person.name}
-                    <span className="block text-xs font-normal text-muted-foreground capitalize">{person.role.replaceAll("-", " ")}</span>
-                  </span>
-                </Button>
-              ))}
+          {!globalMessaging && (
+            <div className="mt-5 space-y-3 border-t pt-4">
+              <Input aria-label="Search contacts" placeholder="Search people…" value={search} onChange={(e) => setSearch(e.target.value)} />
+              <div className="max-h-72 space-y-2 overflow-y-auto">
+                {people.map((person) => (
+                  <Button key={person.id} variant="outline" className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left" onClick={() => startDirect(person)}>
+                    <MessageSquare />
+                    <span>
+                      {person.name}
+                      <span className="block text-xs font-normal text-muted-foreground capitalize">{person.role.replaceAll("-", " ")}</span>
+                    </span>
+                  </Button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </Panel>
         <Panel title={active ? conversationLabel(active) : "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime · double-click a message to reply` : "Select a conversation"}>
           <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96" aria-label="Conversation history" aria-live="polite">
