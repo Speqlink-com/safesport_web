@@ -1,6 +1,8 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import { Choice, Field, Notes, Check } from "./ui";
+import { CheckCircle2 } from "lucide-react";
+import { Field, Notes, Check } from "./ui";
+import { human } from "./catalog";
 import {
   detailFields,
   questionExtraFields,
@@ -67,7 +69,7 @@ export function PPEHistoryFields({
             <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
               {q.domain}
             </p>
-            <Choice
+            <AnswerButtons
               label={q.label}
               value={answer}
               disabled={hidden}
@@ -146,7 +148,7 @@ export function PPEHistoryFields({
       {answers.neurologic === "yes" && (
         <section className="space-y-4 rounded-lg border p-4">
           <h3 className="font-semibold">Concussion history</h3>
-          <Choice
+          <AnswerButtons
             label="Does this include concussion?"
             value={value.concussion?.present || ""}
             options={["yes", "no", "unknown"]}
@@ -269,6 +271,63 @@ export function PPEHistoryFields({
     </div>
   );
 }
+
+function AnswerButtons({
+  label,
+  value,
+  onChange,
+  options,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: (string | { value: string; label: string })[];
+  disabled?: boolean;
+}) {
+  const choices = options.map((option) =>
+    typeof option === "string" ? { value: option, label: human(option) } : option,
+  );
+  return (
+    <fieldset className="space-y-3" disabled={disabled}>
+      <legend className="text-sm font-medium leading-6">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {choices.map((choice) => {
+          const selected = value === choice.value;
+          return (
+            <button
+              key={choice.value}
+              type="button"
+              aria-pressed={selected}
+              disabled={disabled}
+              onClick={() => onChange(choice.value)}
+              className={[
+                "flex min-h-11 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                selected
+                  ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/25"
+                  : "border-border/70 bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                disabled ? "cursor-not-allowed opacity-60" : "",
+              ].join(" ")}
+            >
+              <span>{choice.label}</span>
+              <span
+                className={[
+                  "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                  selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-muted/40",
+                ].join(" ")}
+                aria-hidden="true"
+              >
+                {selected && <CheckCircle2 className="size-3.5" />}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 function HistoryDetails({
   prefix,
   value,
