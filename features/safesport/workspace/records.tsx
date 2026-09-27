@@ -47,6 +47,7 @@ import {
 } from "./ui";
 import { Distribution } from "./distribution";
 import { careApi, AuthApiError } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
 const names: Record<Collection, string> = {
   referrals: "Referrals",
   screenings: "Movement screening",
@@ -70,6 +71,14 @@ const statusOptions: Partial<Record<Collection, string[]>> = {
   tasks: ["pending", "in_progress", "completed"],
   documents: ["available", "returned"],
 };
+const demoAssigneePattern = /dr\.?\s*sarah|sarah\s+njer|sarah\s+ndungu|dr\.?\s*njeri|dr\.?\s*ndungu/i;
+const safeAssignee = (name?: string) => {
+  if (!name) return "";
+  return demoAssigneePattern.test(name) ? "Care team" : name;
+};
+const userDisplayName = (user?: { first_name?: string; last_name?: string } | null) =>
+  [user?.first_name, user?.last_name].filter(Boolean).join(" ").trim();
+
 const typeOptions: Partial<Record<Collection, string[]>> = {
   referrals: [
     "sports_physician",
@@ -289,7 +298,7 @@ export function Records({
               </div>
               <div>
                 <dt className="text-muted-foreground">Assigned to</dt>
-                <dd>{detail.assigned || "Awaiting assignment"}</dd>
+                <dd>{safeAssignee(detail.assigned) || "Awaiting assignment"}</dd>
               </div>
               <div>
                 <dt className="text-muted-foreground">Date / follow-up</dt>
@@ -406,8 +415,8 @@ export function Records({
                   : r.title,
               status: r.status,
               detail: r.athleteId
-                ? `${fullName(state.athletes.find((a) => a.id === r.athleteId))} · ${r.assigned || "Unassigned"}`
-                : r.assigned,
+                ? `${fullName(state.athletes.find((a) => a.id === r.athleteId))} · ${safeAssignee(r.assigned) || "Unassigned"}`
+                : safeAssignee(r.assigned) || "Unassigned",
               date: r.date,
               to:
                 collection === "plans" ||
@@ -471,6 +480,8 @@ function RecordForm({
   readOnly?: boolean;
 }) {
   const { state, setState } = useWorkspace();
+  const authUser = useAuthStore((auth) => auth.user);
+  const currentUserName = userDisplayName(authUser) || identities[role].name;
   const athletes = visibleAthletes(state, role);
   const query = useSearchParams();
   const defaultAthlete =
@@ -492,7 +503,7 @@ function RecordForm({
       status: statusOptions[collection]?.[0] || "pending",
       date: today,
       notes: "",
-      assigned: identities[role].name,
+      assigned: currentUserName,
       kind: typeOptions[collection]?.[0] || collection,
       urgency: "routine",
       outcome: "",
@@ -592,7 +603,7 @@ function RecordForm({
           {
             id: newId("event"),
             title: `${names[collection]} record ${initial ? "updated" : "created"}`,
-            actor: identities[role].name,
+            actor: currentUserName,
             date: new Date().toISOString(),
           },
           ...s.audit,
@@ -1010,6 +1021,8 @@ function ScreeningCapture({
   onClose: () => void;
 }) {
   const { state, update } = useWorkspace();
+  const authUser = useAuthStore((auth) => auth.user);
+  const currentUserName = userDisplayName(authUser) || identities[role].name;
   const athletes = visibleAthletes(state, role);
   const router = useRouter();
   const [athleteId, setAthleteId] = useState(athletes[0]?.id || "");
@@ -1030,7 +1043,7 @@ function ScreeningCapture({
           status: "draft",
           quality: "pending",
           date: today,
-          assigned: identities[role].name,
+          assigned: currentUserName,
           notes: "",
           file: file.url,
           fileName: file.name,

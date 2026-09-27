@@ -781,7 +781,10 @@ function AthleteRecord({ role, athlete: a }: { role: Role; athlete: Athlete }) {
 }
 export function Health({ role, view }: { role: Role; view?: string }) {
   const { state } = useWorkspace();
+  const authUser = useAuthStore((auth) => auth.user);
+  const authName = [authUser?.first_name, authUser?.last_name].filter(Boolean).join(" ").trim();
   const a = visibleAthletes(state, role)[0];
+  const healthName = role === "athlete" && authName ? authName : fullName(a);
   const search = useSearchParams();
   if (!a)
     return (
@@ -794,7 +797,7 @@ export function Health({ role, view }: { role: Role; view?: string }) {
     <>
       <PageHeading
         title="My health"
-        description={`${fullName(a)} · Your care journey, participation status and next steps.`}
+        description={`${healthName} · Your care journey, participation status and next steps.`}
       />
       <Tabbed
         initial={

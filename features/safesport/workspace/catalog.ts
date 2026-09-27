@@ -24,9 +24,9 @@ export const identities: Record<
     email: "jane@example.test",
   },
   clinician: {
-    name: "Dr Sarah Njeri",
+    name: "Clinician",
     title: "Clinician",
-    email: "sarah@safesport.test",
+    email: "clinician@safesport.test",
   },
   physiotherapist: {
     name: "James Ochieng",
