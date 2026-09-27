@@ -218,6 +218,87 @@ export const careApi = {
     }),
 };
 
+export interface ReportAthlete {
+  id: string;
+  name: string;
+  institution: string;
+  sport: string;
+}
+
+export interface TermReportSummary {
+  id: string;
+  athlete_id: string;
+  athlete_name: string;
+  title: string;
+  period_start: string;
+  period_end: string;
+  status: string;
+  created_at: string;
+}
+
+export const reportsApi = {
+  athletes: () => request<ReportAthlete[]>("/reports/athletes"),
+  generateTermly: (payload: { title: string; period_start: string; period_end: string }) =>
+    request<TermReportSummary[]>("/reports/termly/generate", { method: "POST", body: JSON.stringify(payload) }),
+  termly: () => request<TermReportSummary[]>("/reports/termly"),
+  downloadFull: (athleteId: string, filename = `safesport-full-report-${athleteId}.pdf`) =>
+    downloadFile(`/reports/full/${athleteId}`, filename),
+  downloadTermly: (reportId: string, filename = `safesport-term-report-${reportId}.pdf`) =>
+    downloadFile(`/reports/termly/${reportId}`, filename),
+};
+
+export interface MessageUser {
+  id: string;
+  name: string;
+  role: string;
+  institution_id?: string | null;
+}
+
+export interface MessageItem {
+  id: string;
+  conversation_id: string;
+  sender: MessageUser;
+  body: string;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+  created_at: string;
+}
+
+export interface ConversationItem {
+  id: string;
+  kind: string;
+  title: string;
+  institution_id?: string | null;
+  members: MessageUser[];
+  messages: MessageItem[];
+}
+
+export interface MessagingWorkspacePayload {
+  current_user: MessageUser;
+  people: MessageUser[];
+  conversations: ConversationItem[];
+}
+
+function websocketUrl(path: string): string {
+  const base = API_URL.replace(/^http/, "ws").replace(/\/api\/v1$/, "");
+  return `${base}/api/v1${path}`;
+}
+
+export const messagingApi = {
+  workspace: () => request<MessagingWorkspacePayload>("/messaging/workspace"),
+  startDirect: (recipientId: string) =>
+    request<ConversationItem>(`/messaging/conversations/direct/${recipientId}`, { method: "POST" }),
+  sendMessage: (conversationId: string, body: string, attachment?: File | null) => {
+    const form = new FormData();
+    form.set("conversation_id", conversationId);
+    form.set("body", body);
+    if (attachment) form.set("attachment", attachment);
+    return request<MessageItem>("/messaging/messages", { method: "POST", body: form });
+  },
+  wsUrl: (conversationId: string) => websocketUrl(`/messaging/ws/${conversationId}`),
+};
+
 export function dashboardForRole(role: string): string {
   return `/safesport/${role}`;
 }

@@ -1,15 +1,16 @@
 "use client";
 import Image from "next/image";
-import { useState } from "react";
-import { Send, Paperclip, CheckCheck, MessageSquare, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Send, Paperclip, CheckCheck, MessageSquare, X, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { identities, href, type Role } from "./catalog";
-import { useWorkspace, newId, type Message } from "./store";
+import { useWorkspace } from "./store";
 import { PageHeading, Panel, Empty, Go, Choice, Status } from "./ui";
+import { messagingApi, type ConversationItem, type MessageItem, type MessageUser } from "@/features/auth/api";
 const contacts: Record<Role, Role[]> = {
   athlete: ["clinician", "physiotherapist", "coach"],
   guardian: ["clinician", "physiotherapist", "operations"],
@@ -110,226 +111,189 @@ export function Notifications({ role }: { role: Role }) {
   );
 }
 export function Messages({ role }: { role: Role }) {
-  const { state, setState } = useWorkspace();
-  const [recipient, setRecipient] = useState<Role>(contacts[role][0]);
+  const [workspace, setWorkspace] = useState<{
+    current_user: MessageUser;
+    people: MessageUser[];
+    conversations: ConversationItem[];
+  } | null>(null);
+  const [activeId, setActiveId] = useState("");
   const [search, setSearch] = useState("");
   const [text, setText] = useState("");
-  const [attachment, setAttachment] = useState<{
-    url: string;
-    name: string;
-    type: string;
-  } | null>(null);
+  const [attachment, setAttachment] = useState<{ file: File; url: string; name: string; type: string } | null>(null);
   const [fileKey, setFileKey] = useState(0);
-  const thread = [role, recipient].sort().join(":");
-  const messages = state.messages.filter(
-    (m) => m.thread === thread && (m.sender === role || m.recipient === role),
-  );
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void messagingApi.workspace()
+      .then((payload) => {
+        if (!active) return;
+        setWorkspace(payload);
+        setActiveId(payload.conversations[0]?.id || "");
+      })
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Unable to load messages"));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const ws = new WebSocket(messagingApi.wsUrl(activeId));
+    ws.onmessage = (event) => {
+      const payload = JSON.parse(event.data) as { type?: string; message?: MessageItem };
+      if (payload.type !== "message" || !payload.message) return;
+      const incoming = payload.message;
+      setWorkspace((current) => current ? {
+        ...current,
+        conversations: current.conversations.map((conversation) =>
+          conversation.id === activeId && !conversation.messages.some((message) => message.id === incoming.id)
+            ? { ...conversation, messages: [...conversation.messages, incoming] }
+            : conversation,
+        ),
+      } : current);
+      if (incoming.sender.id !== workspace?.current_user.id) {
+        const audio = new Audio("/notification.mp3");
+        audio.play().catch(() => undefined);
+      }
+    };
+    return () => ws.close();
+  }, [activeId, workspace?.current_user.id]);
+
+  const conversations = workspace?.conversations ?? [];
+  const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
+  const people = workspace?.people.filter((person) => `${person.name} ${person.role}`.toLowerCase().includes(search.toLowerCase())) ?? [];
   const clearFile = () => {
     if (attachment) URL.revokeObjectURL(attachment.url);
     setAttachment(null);
     setFileKey((k) => k + 1);
   };
-  function send() {
-    if (!text.trim() && !attachment) return;
-    const date = new Date().toISOString();
-    const id = newId("msg");
-    const message: Message = {
-      id,
-      thread,
-      sender: role,
-      recipient,
-      text: text.trim(),
-      date,
-      file: attachment?.url,
-      fileName: attachment?.name,
-      fileType: attachment?.type,
-    };
-    setState((s) => ({
-      ...s,
-      messages: [...s.messages, message],
-      notices:
-        s.preferences[`${recipient}-messages`] === false
-          ? s.notices
-          : [
-              {
-                id: `notice-${id}`,
-                role: recipient,
-                title: `New message from ${s.accounts[role]?.name || identities[role].name}`,
-                path: "messages",
-                read: false,
-                date,
-              },
-              ...s.notices,
-            ],
-    }));
-    setText("");
-    setAttachment(null);
-    setFileKey((k) => k + 1);
-    toast.success("Message added to the local conversation");
-  }
+  const startDirect = async (person: MessageUser) => {
+    try {
+      const conversation = await messagingApi.startDirect(person.id);
+      setWorkspace((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          conversations: [conversation, ...current.conversations.filter((item) => item.id !== conversation.id)],
+        };
+      });
+      setActiveId(conversation.id);
+      setText("");
+      clearFile();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to open conversation");
+    }
+  };
+  const send = async () => {
+    if (!active || (!text.trim() && !attachment)) return;
+    setSending(true);
+    try {
+      const message = await messagingApi.sendMessage(active.id, text.trim(), attachment?.file);
+      setWorkspace((current) => current ? {
+        ...current,
+        conversations: current.conversations.map((conversation) =>
+          conversation.id === active.id && !conversation.messages.some((item) => item.id === message.id)
+            ? { ...conversation, messages: [...conversation.messages, message] }
+            : conversation,
+        ),
+      } : current);
+      setText("");
+      clearFile();
+      toast.success("Message sent");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to send message");
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <>
       <PageHeading
         title="Messages"
-        description="Private demo conversations with your connected team. Messages are local to this tab and are never sent externally."
+        description="Institution-bounded realtime conversations. Clinicians, physiotherapists and system administrators can communicate across institutions."
       />
-      <div className="grid min-h-[600px] gap-5 lg:grid-cols-[260px_1fr]">
+      <div className="grid min-h-[600px] gap-5 lg:grid-cols-[300px_1fr]">
         <Panel title="Conversations">
-          <Input
-            aria-label="Search contacts"
-            placeholder="Search contacts…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
           <div className="space-y-2">
-            {contacts[role]
-              .filter((r) =>
-                `${identities[r].name} ${identities[r].title}`
-                  .toLowerCase()
-                  .includes(search.toLowerCase()),
-              )
-              .map((r) => (
-                <Button
-                  key={r}
-                  variant="ghost"
-                  aria-pressed={recipient === r}
-                  className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left aria-pressed:bg-primary/10 aria-pressed:ring-1 aria-pressed:ring-primary/20"
-                  onClick={() => {
-                    setRecipient(r);
-                    setText("");
-                    clearFile();
-                  }}
-                >
+            {conversations.map((conversation) => (
+              <Button
+                key={conversation.id}
+                variant="ghost"
+                aria-pressed={active?.id === conversation.id}
+                className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left aria-pressed:bg-primary/10 aria-pressed:ring-1 aria-pressed:ring-primary/20"
+                onClick={() => setActiveId(conversation.id)}
+              >
+                {conversation.kind === "institution_group" ? <Users /> : <MessageSquare />}
+                <span>
+                  {conversation.title}
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {conversation.members.length} member{conversation.members.length === 1 ? "" : "s"}
+                  </span>
+                </span>
+              </Button>
+            ))}
+          </div>
+          <div className="mt-5 space-y-3 border-t pt-4">
+            <Input aria-label="Search contacts" placeholder="Search people…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <div className="max-h-72 space-y-2 overflow-y-auto">
+              {people.map((person) => (
+                <Button key={person.id} variant="outline" className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left" onClick={() => startDirect(person)}>
                   <MessageSquare />
                   <span>
-                    {state.accounts[r]?.name || identities[r].name}
-                    <span className="block text-xs font-normal text-muted-foreground">
-                      {identities[r].title}
-                    </span>
+                    {person.name}
+                    <span className="block text-xs font-normal text-muted-foreground capitalize">{person.role.replaceAll("-", " ")}</span>
                   </span>
                 </Button>
               ))}
+            </div>
           </div>
         </Panel>
-        <Panel
-          title={state.accounts[recipient]?.name || identities[recipient].name}
-          description={`${identities[recipient].title} · Demo conversation`}
-        >
-          <div
-            className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96"
-            aria-label="Conversation history"
-            aria-live="polite"
-          >
-            {!messages.length && (
-              <Empty
-                title="Start a conversation"
-                description="Send a message or attach a file to this local conversation."
-              />
-            )}
-            {messages.map((m) => (
-              <article
-                key={m.id}
-                className={`max-w-[90%] rounded-xl border p-3 sm:max-w-[80%] ${m.sender === role ? "self-end bg-primary/10" : "self-start bg-background"}`}
-              >
-                <p className="mb-1 text-xs font-medium text-muted-foreground">
-                  {state.accounts[m.sender]?.name || identities[m.sender].name}
-                </p>
-                {m.text && (
-                  <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                    {m.text}
-                  </p>
-                )}
-                {m.file && (
-                  <Attachment
-                    url={m.file}
-                    name={m.fileName || "Attachment"}
-                    type={m.fileType || ""}
-                  />
-                )}
-                <p className="mt-2 text-[10px] text-muted-foreground">
-                  {m.date.slice(0, 16).replace("T", " · ")} · Local
-                </p>
+        <Panel title={active?.title || "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime` : "Select a conversation"}>
+          <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96" aria-label="Conversation history" aria-live="polite">
+            {!active?.messages.length && <Empty title="Start a conversation" description="Send a message or attach a file." />}
+            {active?.messages.map((m) => (
+              <article key={m.id} className={`max-w-[90%] rounded-xl border p-3 sm:max-w-[80%] ${m.sender.id === workspace?.current_user.id ? "self-end bg-primary/10" : "self-start bg-background"}`}>
+                <p className="mb-1 text-xs font-medium text-muted-foreground">{m.sender.name}</p>
+                {m.body && <p className="whitespace-pre-wrap break-words text-sm leading-6">{m.body}</p>}
+                {m.attachment_url && <Attachment url={m.attachment_url} name={m.attachment_name || "Attachment"} type={m.attachment_type || ""} />}
+                <p className="mt-2 text-[10px] text-muted-foreground">{m.created_at.slice(0, 16).replace("T", " · ")}</p>
               </article>
             ))}
           </div>
-          <form
-            className="space-y-3 border-t border-border/50 pt-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              send();
-            }}
-          >
+          <form className="space-y-3 border-t border-border/50 pt-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             <Label htmlFor="message-text">Message</Label>
-            <Textarea
-              id="message-text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Write a message…"
-              maxLength={5000}
-            />
+            <Textarea id="message-text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" maxLength={5000} />
             {attachment && (
               <div className="rounded-lg border p-3">
-                <Attachment
-                  url={attachment.url}
-                  name={attachment.name}
-                  type={attachment.type}
-                />
-                <Button variant="ghost" onClick={clearFile}>
-                  <X />
-                  Remove attachment
-                </Button>
+                <Attachment url={attachment.url} name={attachment.name} type={attachment.type} />
+                <Button type="button" variant="ghost" onClick={clearFile}><X />Remove attachment</Button>
               </div>
             )}
             <div className="flex flex-wrap items-end justify-between gap-3">
               <div className="max-w-xs space-y-2">
-                <Label htmlFor="message-file">
-                  <Paperclip className="size-3" />
-                  Attachment · up to 10 MB
-                </Label>
-                <Input
-                  key={fileKey}
-                  id="message-file"
-                  type="file"
-                  accept="image/*,video/*,application/pdf,text/plain"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    if (
-                      f.size > 10 * 1024 * 1024 ||
-                      !(
-                        /^(image|video)\//.test(f.type) ||
-                        ["application/pdf", "text/plain"].includes(f.type)
-                      )
-                    ) {
-                      toast.error(
-                        "Choose an image, video, PDF or text file up to 10 MB.",
-                      );
-                      return;
-                    }
-                    if (attachment) URL.revokeObjectURL(attachment.url);
-                    setAttachment({
-                      url: URL.createObjectURL(f),
-                      name: f.name,
-                      type: f.type,
-                    });
-                  }}
-                />
+                <Label htmlFor="message-file"><Paperclip className="size-3" />Attachment · up to 10 MB</Label>
+                <Input key={fileKey} id="message-file" type="file" accept="image/*,video/*,application/pdf,text/plain" onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (!f) return;
+                  if (f.size > 10 * 1024 * 1024 || !(/^(image|video)\//.test(f.type) || ["application/pdf", "text/plain"].includes(f.type))) {
+                    toast.error("Choose an image, video, PDF or text file up to 10 MB.");
+                    return;
+                  }
+                  if (attachment) URL.revokeObjectURL(attachment.url);
+                  setAttachment({ file: f, url: URL.createObjectURL(f), name: f.name, type: f.type });
+                }} />
               </div>
-              <Button type="submit" disabled={!text.trim() && !attachment}>
-                <Send />
-                Send locally
-              </Button>
+              <Button type="submit" disabled={sending || !active || (!text.trim() && !attachment)}><Send />Send</Button>
             </div>
           </form>
-          <p className="text-xs text-muted-foreground">
-            Switch demo roles to view the recipient’s conversation. Clinical
-            information must stay within the authorized care relationship.
-          </p>
         </Panel>
       </div>
     </>
   );
 }
+
 function Attachment({
   url,
   name,

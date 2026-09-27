@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Plus, CalendarDays, Video } from "lucide-react";
@@ -46,7 +46,7 @@ import {
   Export,
 } from "./ui";
 import { Distribution } from "./distribution";
-import { careApi, AuthApiError } from "@/features/auth/api";
+import { careApi, reportsApi, AuthApiError, type ReportAthlete, type TermReportSummary } from "@/features/auth/api";
 import { useAuthStore } from "@/features/auth/store";
 const names: Record<Collection, string> = {
   referrals: "Referrals",
@@ -1488,33 +1488,36 @@ export function Reports({
 }) {
   const { state } = useWorkspace();
   const athletes = visibleAthletes(state, role);
-  const eligible = athletes.filter(
-    (a) => a.eligibilityStatus === "cleared",
-  ).length;
-  const completed = state.encounters.filter(
-    (e) => e.finalized && athletes.some((a) => a.id === e.athleteId),
-  ).length;
+  const [reportAthletes, setReportAthletes] = useState<ReportAthlete[]>([]);
+  const [termReports, setTermReports] = useState<TermReportSummary[]>([]);
+  const [periodStart, setPeriodStart] = useState(`${new Date().getFullYear()}-01-01`);
+  const [periodEnd, setPeriodEnd] = useState(today);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void Promise.all([reportsApi.athletes(), reportsApi.termly()])
+      .then(([loadedAthletes, loadedReports]) => {
+        if (!active) return;
+        setReportAthletes(loadedAthletes);
+        setTermReports(loadedReports);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const scopedAthletes = reportAthletes.length
+    ? reportAthletes
+    : athletes.map((athlete) => ({
+        id: athlete.id,
+        name: fullName(athlete),
+        institution: athlete.currentOrganization?.name || "",
+        sport: athlete.currentSport?.name || "",
+      }));
   const referrals = scopedRecords(state, role, "referrals");
   const screenings = scopedRecords(state, role, "screenings");
-  const rows = [
-    { name: "Athletes in scope", value: athletes.length },
-    { name: "Cleared without restrictions", value: eligible },
-    { name: "Finalized PPE assessments", value: completed },
-    {
-      name: "Reviewed movement screenings",
-      value: screenings.filter((s) => s.reviewer).length,
-    },
-    {
-      name: "Open referrals",
-      value: referrals.filter((r) => r.status !== "completed").length,
-    },
-    {
-      name: "Clinical consent obtained",
-      value: athletes.filter(
-        (a) => state.consents[a.id]?.clinical === "obtained",
-      ).length,
-    },
-  ];
   const reportKind = view.split("/").at(-1) || "reports";
   const labels: Record<string, string> = {
     injuries: "Injury trends",
@@ -1523,110 +1526,86 @@ export function Reports({
     screening: "Screening completion",
     compliance: "Consent compliance",
   };
-  const detailRows =
-    reportKind === "injuries"
-      ? ["minor", "moderate", "severe", "emergency"].map((severity) => ({
-          id: severity,
-          name: human(severity),
-          status: "aggregate",
-          detail: `${scopedRecords(state, role, "incidents").filter((r) => r.urgency === severity).length} incidents`,
-        }))
-      : reportKind === "screening"
-        ? ["draft", "processing", "ready_for_review", "reviewed"].map(
-            (status) => ({
-              id: status,
-              name: human(status),
-              status,
-              detail: `${screenings.filter((r) => r.status === status).length} screenings`,
-            }),
-          )
-        : reportKind === "compliance"
-          ? ["obtained", "deferred", "declined", "withdrawn"].map((status) => ({
-              id: status,
-              name: human(status),
-              status,
-              detail: `${athletes.filter((a) => (state.consents[a.id]?.clinical || "deferred") === status).length} athletes`,
-            }))
-          : state.teams
-              .filter((t) => athletes.some((a) => a.currentTeam?.id === t.id))
-              .map((t) => ({
-                id: t.id,
-                name: t.name,
-                status: "aggregate",
-                detail: `${athletes.filter((a) => a.currentTeam?.id === t.id).length} athletes · ${athletes.filter((a) => a.currentTeam?.id === t.id && a.eligibilityStatus === "cleared").length} cleared`,
-              }));
-  const content = [
-    "SafeSport demo report",
-    `Scope: ${identities[role].title}`,
-    `Snapshot: ${today}`,
-    ...rows.map((r) => `${r.name},${r.value}`),
-    ...detailRows.map((r) => `${r.name},${r.detail}`),
-  ].join("\n");
+  const rows = [
+    { name: "Athletes in scope", value: scopedAthletes.length },
+    { name: "Finalized PPE assessments", value: state.encounters.filter((e) => e.finalized && scopedAthletes.some((a) => a.id === e.athleteId)).length },
+    { name: "Open referrals", value: referrals.filter((r) => r.status !== "completed").length },
+    { name: "Reviewed movement screenings", value: screenings.filter((s) => s.reviewer).length },
+  ];
+  const generateTermReports = async () => {
+    setBusy(true);
+    try {
+      const reports = await reportsApi.generateTermly({
+        title: "Termly athlete progress report",
+        period_start: periodStart,
+        period_end: periodEnd,
+      });
+      setTermReports(reports);
+      toast.success("Term reports generated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to generate term reports");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <>
       <PageHeading
         title={labels[reportKind] || "Reports & readiness"}
-        description="Counts are derived from the records visible in your role. Unrecorded information remains incomplete."
-      >
-        <Export name={`${role}-demo-report.csv`} content={content} />
-      </PageHeading>
-      <div className="grid divide-y overflow-hidden rounded-xl border bg-card sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-3">
+        description="Generate SafeSport PDF reports from the athlete records available to your role."
+      />
+      <div className="grid divide-y overflow-hidden rounded-xl border bg-card sm:grid-cols-2 sm:divide-y-0 xl:grid-cols-4">
         {rows.map((r) => (
-          <div
-            key={r.name}
-            className="border-b border-border/50 p-5 sm:border-r"
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {r.name}
-            </p>
+          <div key={r.name} className="border-b border-border/50 p-5 sm:border-r">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{r.name}</p>
             <p className="mt-3 text-3xl font-bold tabular-nums">{r.value}</p>
           </div>
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Panel
-          title="Participation distribution"
-          description="Current clinician decisions within your permitted scope."
-        >
-          <Distribution
-            label="Participation distribution"
-            data={Array.from(
-              new Set(athletes.map((a) => a.eligibilityStatus)),
-            ).map((status) => ({
-              name: human(status),
-              value: athletes.filter((a) => a.eligibilityStatus === status)
-                .length,
-            }))}
-          />
-        </Panel>
-        <Panel
-          title="Referral workload"
-          description="Current referral stages, including completed follow-up."
-        >
-          <Distribution
-            label="Referral workload"
-            data={Array.from(new Set(referrals.map((r) => r.status))).map(
-              (status) => ({
-                name: human(status),
-                value: referrals.filter((r) => r.status === status).length,
-              }),
-            )}
-          />
-        </Panel>
-      </div>
-      <Panel title={labels[reportKind] || "Team summary"}>
-        <DataList rows={detailRows} label="aggregate groups" />
+      <Panel title="Full athlete reports" description="Multi-page PDF with basic details, PPE, health records, incidents, rehabilitation and documents known to SafeSport.">
+        <DataList
+          label="athletes"
+          rows={scopedAthletes.map((athlete) => ({
+            id: athlete.id,
+            name: athlete.name,
+            status: athlete.sport || "athlete",
+            detail: athlete.institution || "Registered athlete",
+            action: (
+              <Button variant="outline" onClick={() => reportsApi.downloadFull(athlete.id, `safesport-full-report-${athlete.name.replaceAll(" ", "-").toLowerCase()}.pdf`).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to download report"))}>
+                Download full PDF
+              </Button>
+            ),
+          }))}
+        />
       </Panel>
-      <Panel title="Report scope">
+      <Panel title="Termly reports" description="Institution-generated one-page progress reports. Once generated, linked athletes and guardians can download their available report.">
+        {role === "institution" && (
+          <div className="mb-5 grid gap-3 rounded-xl border bg-muted/30 p-4 sm:grid-cols-[1fr_1fr_auto]">
+            <Field label="Period start" type="date" value={periodStart} onChange={setPeriodStart} />
+            <Field label="Period end" type="date" value={periodEnd} onChange={setPeriodEnd} />
+            <Button className="self-end" disabled={busy} onClick={generateTermReports}>Generate reports</Button>
+          </div>
+        )}
+        <DataList
+          label="term reports"
+          rows={termReports.map((report) => ({
+            id: report.id,
+            name: report.athlete_name,
+            status: report.status,
+            date: report.created_at.slice(0, 10),
+            detail: `${report.title} · ${report.period_start} to ${report.period_end}`,
+            action: (
+              <Button variant="outline" onClick={() => reportsApi.downloadTermly(report.id).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to download term report"))}>
+                Download term PDF
+              </Button>
+            ),
+          }))}
+        />
+      </Panel>
+      <Panel title="AI screening report template">
         <p className="text-sm text-muted-foreground">
-          {role === "institution"
-            ? "Green Valley Academy aggregate operational data only. No clinical findings, AI metrics or sensitive narratives are included."
-            : personal(role)
-              ? "Only your permitted athlete records are included."
-              : "This report summarizes the currently visible demo records."}
-        </p>
-        <p className="text-sm">
-          Demo snapshot · {today} · Counts change as records are edited.
+          The AI screening report shell is reserved for the AI phase. Screening PDFs will use this same report area once AI analysis is connected.
         </p>
       </Panel>
     </>
