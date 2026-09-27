@@ -17,11 +17,13 @@ export function PPEHistoryFields({
   onChange,
   guardian = false,
   clinician = false,
+  readOnly = false,
 }: {
   value: Encounter;
   onChange: (patch: Partial<Encounter>) => void;
   guardian?: boolean;
   clinician?: boolean;
+  readOnly?: boolean;
 }) {
   const answers = value.historyAnswers || {};
   const patch = (change: Partial<Encounter>) =>
@@ -72,7 +74,7 @@ export function PPEHistoryFields({
             <AnswerButtons
               label={q.label}
               value={answer}
-              disabled={hidden}
+              disabled={hidden || readOnly}
               options={[
                 "yes",
                 "no",
@@ -102,6 +104,7 @@ export function PPEHistoryFields({
               <HistoryDetails
                 prefix={q.label}
                 value={value.historyDetails?.[q.id] || {}}
+                readOnly={readOnly}
                 onChange={(next) => detail(q.id, next)}
               />
             )}
@@ -220,6 +223,7 @@ export function PPEHistoryFields({
                     ),
                   })
                 }
+                disabled={readOnly}
               />
               <HistoryDetails
                 prefix={`Injury ${i + 1}`}
@@ -234,6 +238,7 @@ export function PPEHistoryFields({
               />
               <Button
                 variant="outline"
+                disabled={readOnly}
                 onClick={() =>
                   patch({
                     injuries: value.injuries?.filter(
@@ -246,19 +251,21 @@ export function PPEHistoryFields({
               </Button>
             </div>
           ))}
-          <Button
-            variant="outline"
-            onClick={() =>
-              patch({
-                injuries: [
-                  ...(value.injuries || []),
-                  { id: newId("injury"), region: "" },
-                ],
-              })
-            }
-          >
-            Add injury / current problem
-          </Button>
+          {!readOnly && (
+            <Button
+              variant="outline"
+              onClick={() =>
+                patch({
+                  injuries: [
+                    ...(value.injuries || []),
+                    { id: newId("injury"), region: "" },
+                  ],
+                })
+              }
+            >
+              Add injury / current problem
+            </Button>
+          )}
         </section>
       )}
       {clinician && (
@@ -332,10 +339,12 @@ function HistoryDetails({
   prefix,
   value,
   onChange,
+  readOnly = false,
 }: {
   prefix: string;
   value: HistoryDetail;
   onChange: (next: HistoryDetail) => void;
+  readOnly?: boolean;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -345,6 +354,7 @@ function HistoryDetails({
           label={`${prefix} — ${label}`}
           value={value[key] || ""}
           onChange={(v) => onChange({ ...value, [key]: v })}
+          disabled={readOnly}
         />
       ))}
     </div>

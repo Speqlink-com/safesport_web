@@ -257,7 +257,10 @@ function QuestionnaireForm({
   athleteId: string;
 }) {
   const { state, update } = useWorkspace();
-  const existing = state.encounters.find(
+  const finalized = state.encounters.find(
+    (e) => e.athleteId === athleteId && e.finalized,
+  );
+  const existing = finalized ?? state.encounters.find(
     (e) => e.athleteId === athleteId && !e.finalized,
   );
   const [form, setForm] = useState<Encounter>(() => {
@@ -280,6 +283,7 @@ function QuestionnaireForm({
   });
   const count = ppeQuestions.filter((q) => form.historyAnswers?.[q.id]).length;
   const consent = state.consents[athleteId]?.clinical === "obtained";
+  const locked = form.finalized || !!form.historySubmitted;
   return (
     <Panel
       title="Health history"
@@ -289,6 +293,11 @@ function QuestionnaireForm({
       <p className="text-sm text-muted-foreground">
         {count} of {ppeQuestions.length} questions answered
       </p>
+      {locked && (
+        <p className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+          This questionnaire has been submitted and is now read-only. Clinician review notes and final PPE status appear here as they are completed.
+        </p>
+      )}
       {!consent && (
         <p role="status" className="rounded-lg bg-muted p-3">
           Complete clinical consent before submitting this questionnaire.{" "}
@@ -341,51 +350,56 @@ function QuestionnaireForm({
         <PPEHistoryFields
           value={form}
           guardian={role === "guardian"}
-          onChange={(patch) =>
-            setForm({ ...form, ...patch, historySubmitted: false })
-          }
+          readOnly={locked}
+          clinician={locked}
+          onChange={(patch) => {
+            if (locked) return;
+            setForm({ ...form, ...patch, historySubmitted: false });
+          }}
         />
-        <div className="flex gap-2">
-          <Button type="submit" disabled={!consent}>
-            Submit for review
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={async () => {
-              const candidate = {
-                ...form,
-                status: "draft",
-                historySubmitted: false,
-                reviewed: false,
-              };
-              try {
-                const saved = (await ppeApi.saveQuestionnaireDraft(
-                  athleteId,
-                  candidate as unknown as Record<string, unknown>,
-                )) as unknown as Encounter;
-                update(
-                  (s) => ({
-                    ...s,
-                    encounters: [
-                      saved,
-                      ...s.encounters.filter((e) => e.id !== saved.id),
-                    ],
-                  }),
-                  `Questionnaire draft saved for ${athleteId}`,
-                  role,
-                  "questionnaires",
-                );
-                setForm(saved);
-                toast.success("Draft saved");
-              } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Unable to save draft");
-              }
-            }}
-          >
-            Save draft
-          </Button>
-        </div>
+        {!locked && (
+          <div className="flex gap-2">
+            <Button type="submit" disabled={!consent}>
+              Submit for review
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                const candidate = {
+                  ...form,
+                  status: "draft",
+                  historySubmitted: false,
+                  reviewed: false,
+                };
+                try {
+                  const saved = (await ppeApi.saveQuestionnaireDraft(
+                    athleteId,
+                    candidate as unknown as Record<string, unknown>,
+                  )) as unknown as Encounter;
+                  update(
+                    (s) => ({
+                      ...s,
+                      encounters: [
+                        saved,
+                        ...s.encounters.filter((e) => e.id !== saved.id),
+                      ],
+                    }),
+                    `Questionnaire draft saved for ${athleteId}`,
+                    role,
+                    "questionnaires",
+                  );
+                  setForm(saved);
+                  toast.success("Draft saved");
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Unable to save draft");
+                }
+              }}
+            >
+              Save draft
+            </Button>
+          </div>
+        )}
       </form>
     </Panel>
   );

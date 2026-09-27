@@ -28,7 +28,7 @@ export function PPEProgress({
   const encounters = state.encounters.filter((e) => e.athleteId === athleteId);
   const encounter = encounterId
     ? encounters.find((e) => e.id === encounterId)
-    : encounters.find((e) => !e.finalized) || encounters[0];
+    : encounters.find((e) => e.finalized) || encounters.find((e) => !e.finalized) || encounters[0];
   const consent = state.consents[athleteId]?.clinical === "obtained";
   const refs = scopedRecords(state, role, "referrals").filter(
     (r) => r.athleteId === athleteId,
@@ -134,7 +134,7 @@ export function PPEProgress({
       owner: "Clinician → athlete portal",
       done: !!encounter?.finalized,
       detail: encounter?.finalized
-        ? "A demo certificate is available with the clinician’s actual decision and any restrictions. Follow-up may still be ongoing."
+        ? "A verified certificate is available with the clinician’s decision and any restrictions. Follow-up may still be ongoing."
         : "Available after the clinician finalizes and signs this assessment.",
       path: role === "physiotherapist" ? undefined : "certificates",
     },
