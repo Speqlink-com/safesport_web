@@ -304,11 +304,16 @@ export function Messages({ role }: { role: Role }) {
           )}
         </Panel>
         <Panel title={active ? conversationLabel(active) : "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime · double-click a message to reply` : "Select a conversation"}>
-          <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96" aria-label="Conversation history" aria-live="polite">
+          <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 [scrollbar-color:hsl(var(--primary))_transparent] [scrollbar-width:thin] sm:h-96 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-primary/60 hover:[&::-webkit-scrollbar-thumb]:bg-primary" aria-label="Conversation history" aria-live="polite">
             {!active?.messages.length && <Empty title="Start a conversation" description="Send a message or attach a file." />}
             {active?.messages.map((m) => (
               <article key={m.id} onDoubleClick={() => setReplyTo(m)} className={`max-w-[90%] cursor-pointer rounded-xl border p-3 sm:max-w-[80%] ${m.sender.id === workspace?.current_user.id ? "self-end bg-primary/10" : "self-start bg-background"}`}>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">{m.sender.name}</p>
+                <div className="mb-1 flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-medium text-muted-foreground">{m.sender.name}</span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium capitalize text-muted-foreground">
+                    {m.sender.role.replaceAll("-", " ")}
+                  </span>
+                </div>
                 {m.body && <p className="whitespace-pre-wrap break-words text-sm leading-6">{m.body}</p>}
                 {m.attachment_url && <Attachment url={m.attachment_url} name={m.attachment_name || "Attachment"} type={m.attachment_type || ""} />}
                 <p className="mt-2 text-[10px] text-muted-foreground">{m.created_at.slice(0, 16).replace("T", " · ")}</p>
@@ -346,7 +351,18 @@ export function Messages({ role }: { role: Role }) {
                 )}
               </div>
             </div>
-            <Textarea id="message-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={replyTo ? "Write your reply…" : "Write a message…"} maxLength={5000} />
+            <Textarea
+              id="message-text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+                e.preventDefault();
+                void send();
+              }}
+              placeholder={replyTo ? "Write your reply…" : "Write a message…"}
+              maxLength={5000}
+            />
             {attachment && (
               <div className="rounded-lg border p-3">
                 <Attachment url={attachment.url} name={attachment.name} type={attachment.type} />
