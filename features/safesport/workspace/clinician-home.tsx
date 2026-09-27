@@ -630,7 +630,7 @@ export function ClinicianHome() {
                 Clinician workspace · {displayDate}
               </p>
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-                Good morning, {firstName}
+                Welcome, {firstName}
               </h1>
               <p className="max-w-lg text-sm leading-relaxed text-muted-foreground">
                 {notices.length > 0
