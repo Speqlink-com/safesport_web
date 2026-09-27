@@ -83,7 +83,11 @@ export function Home({ role }: { role: Role }) {
   );
   const notices = state.notices.filter((n) => n.role === role && !n.read);
   const screened = scopedRecords(state, role, "screenings");
-  const user = state.accounts[role]?.name || identities[role].name;
+  const authUser = useAuthStore((auth) => auth.user);
+  const user =
+    authUser?.role === role
+      ? `${authUser.first_name} ${authUser.last_name}`
+      : state.accounts[role]?.name || identities[role].name;
   const stats =
     role === "sys-admin"
       ? [
