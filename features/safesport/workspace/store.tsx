@@ -2,6 +2,7 @@
 import {
   createContext,
   useContext,
+  useEffect,
   useState,
   type ReactNode,
   type Dispatch,
@@ -18,6 +19,8 @@ import {
 import type { Athlete, EligibilityStatus } from "../types";
 import { type Role, identities } from "./catalog";
 import type { DetailedHistory } from "./ppe-history";
+import { ppeApi } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
 export const today = "2026-09-24";
 export const historyDomains = [
   "Cardiovascular",
@@ -117,6 +120,10 @@ export interface Encounter extends DetailedHistory {
   rationale: string;
   signature: string;
   finalized: boolean;
+  certificateCode?: string | null;
+  certificateIssuedAt?: string | null;
+  physioStatus?: string;
+  physioNote?: string;
   careReview?: { snapshot: string; note: string };
   reassessmentRequestIds?: string[];
 }
@@ -548,6 +555,38 @@ const Context = createContext<{
 } | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState(seed);
+  const authUser = useAuthStore((auth) => auth.user);
+  const isAuthenticated = useAuthStore((auth) => auth.isAuthenticated);
+  const authInitialized = useAuthStore((auth) => auth.authInitialized);
+
+  useEffect(() => {
+    let active = true;
+    if (!authInitialized || !isAuthenticated || !authUser) return;
+    void ppeApi
+      .workspace()
+      .then((payload) => {
+        if (!active) return;
+        setState((current) => {
+          const athletes = payload.athletes as State["athletes"];
+          const primaryAthlete = authUser.role === "athlete" ? authUser.id : athletes[0]?.id || current.athleteId;
+          const guardianAthlete = authUser.role === "guardian" ? athletes[0]?.id || current.guardianId : current.guardianId;
+          return {
+            ...current,
+            athletes,
+            consents: payload.consents as State["consents"],
+            encounters: payload.encounters as State["encounters"],
+            notices: payload.notices as State["notices"],
+            athleteId: primaryAthlete,
+            guardianId: guardianAthlete,
+          };
+        });
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [authInitialized, authUser, isAuthenticated]);
+
   function update(
     change: (s: State) => State,
     title: string,
@@ -621,5 +660,5 @@ export function visibleAthletes(state: State, role: Role) {
 export const fullName = (a?: Athlete) =>
   a ? `${a.firstName} ${a.lastName}` : "Unassigned athlete";
 export function certificateText(a: Athlete, e: Encounter) {
-  return `SAFESPORT — DEMO PARTICIPATION CERTIFICATE\nNot a valid medical certificate\n\n${fullName(a)} • ${a.id}\n${a.currentOrganization?.name} • ${a.currentSport?.name}\nAssessment: ${e.date}\nEligibility: ${e.decision.replaceAll("_", " ")}\nRestrictions: ${e.restrictions || "None specified"}\nMonitoring: ${e.plan || "None specified"}\nReview: ${e.reviewDate}\nClinician: ${e.signature}\nVerification: DEMO-${e.id}\n`;
+  return `SAFESPORT PARTICIPATION CERTIFICATE\nMinimum-necessary participation summary\n\n${fullName(a)} • ${a.id}\n${a.currentOrganization?.name || "—"} • ${a.currentSport?.name || "—"}\nAssessment: ${e.date}\nEligibility: ${e.decision.replaceAll("_", " ")}\nRestrictions: ${e.restrictions || "None specified"}\nMonitoring: ${e.plan || "None specified"}\nReview: ${e.reviewDate || "—"}\nClinician: ${e.signature}\nVerification: ${e.certificateCode || `SAFE-${e.id.slice(0, 8).toUpperCase()}`}\n`;
 }

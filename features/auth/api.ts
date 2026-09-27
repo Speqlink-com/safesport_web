@@ -170,3 +170,27 @@ export const systemAdminApi = {
 export function dashboardForRole(role: string): string {
   return `/safesport/${role}`;
 }
+
+export interface PPEWorkspacePayload {
+  athletes: unknown[];
+  consents: Record<string, unknown>;
+  encounters: unknown[];
+  notices: unknown[];
+}
+
+export const ppeApi = {
+  workspace: () => request<PPEWorkspacePayload>("/ppe/workspace"),
+  saveConsent: (athleteId: string, payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/ppe/consents/${athleteId}`, { method: "PUT", body: JSON.stringify(payload) }),
+  saveQuestionnaireDraft: (athleteId: string, payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/ppe/questionnaires/${athleteId}/draft`, { method: "POST", body: JSON.stringify(payload) }),
+  submitQuestionnaire: (athleteId: string, payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/ppe/questionnaires/${athleteId}/submit`, { method: "POST", body: JSON.stringify(payload) }),
+  startAssessment: (athleteId: string) =>
+    request<Record<string, unknown>>("/ppe/assessments/start", { method: "POST", body: JSON.stringify({ athlete_id: athleteId }) }),
+  saveAssessment: (assessmentId: string, payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}`, { method: "PUT", body: JSON.stringify(payload) }),
+  finalizeAssessment: (assessmentId: string, payload: Record<string, unknown>) =>
+    request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}/finalize`, { method: "POST", body: JSON.stringify(payload) }),
+  certificateUrl: (assessmentId: string) => `${API_URL}/ppe/certificates/${assessmentId}`,
+};

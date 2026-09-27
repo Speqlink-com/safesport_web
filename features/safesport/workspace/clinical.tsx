@@ -8,6 +8,7 @@ import { careSnapshot, hasCare } from "./ppe-care";
 import { toast } from "sonner";
 import { ShieldCheck, AlertCircle, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ppeApi } from "@/features/auth/api";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -92,35 +93,40 @@ function ConsentForm({ role, athleteId }: { role: Role; athleteId: string }) {
   );
   const [confirm, setConfirm] = useState(false);
   const editable = personal(role) || role === "clinician";
-  function save() {
+  async function save() {
     if (!form.signer.trim()) {
       toast.error("Record the consent provider’s name.");
       return;
     }
-    update(
-      (s) => ({
-        ...s,
-        encounters: s.encounters.map((e) =>
-          e.athleteId === athleteId && !e.finalized
-            ? {
-                ...e,
-                status:
-                  form.clinical === "obtained" ? "in_progress" : "blocked",
-              }
-            : e,
-        ),
-        consents: {
-          ...s.consents,
-          [athleteId]: { ...form, at: new Date().toISOString() },
-        },
-      }),
-      `Consent updated for ${athleteId}`,
-      role,
-      "consent",
-      [role, "clinician"],
-    );
-    toast.success("Consent saved in this demo");
-    setConfirm(false);
+    try {
+      const savedConsent = await ppeApi.saveConsent(athleteId, form as unknown as Record<string, unknown>);
+      update(
+        (s) => ({
+          ...s,
+          encounters: s.encounters.map((e) =>
+            e.athleteId === athleteId && !e.finalized
+              ? {
+                  ...e,
+                  status:
+                    form.clinical === "obtained" ? "in_progress" : "blocked",
+                }
+              : e,
+          ),
+          consents: {
+            ...s.consents,
+            [athleteId]: savedConsent as unknown as Consent,
+          },
+        }),
+        `Consent updated for ${athleteId}`,
+        role,
+        "consent",
+        [role, "clinician"],
+      );
+      toast.success("Consent saved");
+      setConfirm(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save consent");
+    }
   }
   return (
     <Panel
@@ -186,7 +192,7 @@ function ConsentForm({ role, athleteId }: { role: Role; athleteId: string }) {
         />
         <p className="text-sm text-muted-foreground">
           Withdrawing consent blocks further protected assessment and new video
-          capture in this demo. Existing records remain visible for care
+          capture. Existing records remain visible for care
           continuity. Last recorded: {form.at?.slice(0, 10) || "Not recorded"}.
         </p>
         {editable && <Button type="submit">Save consent</Button>}
@@ -196,8 +202,7 @@ function ConsentForm({ role, athleteId }: { role: Role; athleteId: string }) {
           <DialogHeader>
             <DialogTitle>Withdraw clinical consent?</DialogTitle>
             <DialogDescription>
-              Further clinical assessment will be blocked. This changes the
-              local demo record.
+              Further clinical assessment will be blocked until consent is restored.
             </DialogDescription>
           </DialogHeader>
           <div className="flex gap-2">
@@ -296,7 +301,7 @@ function QuestionnaireForm({
       )}
       <form
         className="space-y-5"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
           if (!consent) return;
           const errors = historyErrors(form);
@@ -304,28 +309,35 @@ function QuestionnaireForm({
             toast.error(errors[0]);
             return;
           }
-          const saved = {
+          const candidate = {
             ...form,
-            id: form.id === "draft" ? newId("ppe") : form.id,
             status: "needs_review",
             historySubmitted: true,
             reviewed: false,
           };
-          update(
-            (s) => ({
-              ...s,
-              encounters: [
-                saved,
-                ...s.encounters.filter((e) => e.id !== saved.id),
-              ],
-            }),
-            `Health questionnaire submitted for ${athleteId}`,
-            role,
-            "questionnaires",
-            [role, "clinician"],
-          );
-          setForm(saved);
-          toast.success("Questionnaire submitted for clinician review");
+          try {
+            const saved = (await ppeApi.submitQuestionnaire(
+              athleteId,
+              candidate as unknown as Record<string, unknown>,
+            )) as unknown as Encounter;
+            update(
+              (s) => ({
+                ...s,
+                encounters: [
+                  saved,
+                  ...s.encounters.filter((e) => e.id !== saved.id),
+                ],
+              }),
+              `Health questionnaire submitted for ${athleteId}`,
+              role,
+              "questionnaires",
+              [role, "clinician"],
+            );
+            setForm(saved);
+            toast.success("Questionnaire submitted for clinician review");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to submit questionnaire");
+          }
         }}
       >
         <PPEHistoryFields
@@ -340,29 +352,37 @@ function QuestionnaireForm({
             Submit for review
           </Button>
           <Button
+            type="button"
             variant="outline"
-            onClick={() => {
-              const saved = {
+            onClick={async () => {
+              const candidate = {
                 ...form,
                 status: "draft",
                 historySubmitted: false,
                 reviewed: false,
-                id: form.id === "draft" ? newId("ppe") : form.id,
               };
-              update(
-                (s) => ({
-                  ...s,
-                  encounters: [
-                    saved,
-                    ...s.encounters.filter((e) => e.id !== saved.id),
-                  ],
-                }),
-                `Questionnaire draft saved for ${athleteId}`,
-                role,
-                "questionnaires",
-              );
-              setForm(saved);
-              toast.success("Draft saved in this tab");
+              try {
+                const saved = (await ppeApi.saveQuestionnaireDraft(
+                  athleteId,
+                  candidate as unknown as Record<string, unknown>,
+                )) as unknown as Encounter;
+                update(
+                  (s) => ({
+                    ...s,
+                    encounters: [
+                      saved,
+                      ...s.encounters.filter((e) => e.id !== saved.id),
+                    ],
+                  }),
+                  `Questionnaire draft saved for ${athleteId}`,
+                  role,
+                  "questionnaires",
+                );
+                setForm(saved);
+                toast.success("Draft saved");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Unable to save draft");
+              }
             }}
           >
             Save draft
@@ -449,7 +469,7 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
       return (
         <Empty
           title="Assessment unavailable"
-          description="This assessment is not in your permitted demo records."
+          description="This assessment is not in your permitted records."
         >
           <Go to={href(role, "assessments")}>Back to assessments</Go>
         </Empty>
@@ -522,34 +542,36 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
             </Button>
             <Button
               disabled={!selected}
-              onClick={() => {
-                const active = state.encounters.find(
-                  (e) => e.athleteId === selected && !e.finalized,
-                );
-                const e = {
-                  ...(active ?? emptyEncounter(newId("ppe"), selected)),
-                  reassessmentRequestIds: state.records.reviews
-                    .filter(
-                      (r) =>
-                        r.athleteId === selected &&
-                        r.status === "reassessment_requested",
-                    )
-                    .map((r) => r.id),
-                };
-                update(
-                  (s) => ({
-                    ...s,
-                    encounters: [
-                      e,
-                      ...s.encounters.filter((item) => item.id !== e.id),
-                    ],
-                  }),
-                  `Assessment started for ${selected}`,
-                  role,
-                  `assessments/${e.id}`,
-                );
-                setOpen(false);
-                router.push(href(role, `assessments/${e.id}`));
+              onClick={async () => {
+                try {
+                  const started = (await ppeApi.startAssessment(selected)) as unknown as Encounter;
+                  const e = {
+                    ...started,
+                    reassessmentRequestIds: state.records.reviews
+                      .filter(
+                        (r) =>
+                          r.athleteId === selected &&
+                          r.status === "reassessment_requested",
+                      )
+                      .map((r) => r.id),
+                  };
+                  update(
+                    (s) => ({
+                      ...s,
+                      encounters: [
+                        e,
+                        ...s.encounters.filter((item) => item.id !== e.id),
+                      ],
+                    }),
+                    `Assessment started for ${selected}`,
+                    role,
+                    `assessments/${e.id}`,
+                  );
+                  setOpen(false);
+                  router.push(href(role, `assessments/${e.id}`));
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Unable to start assessment");
+                }
               }}
             >
               Open assessment
@@ -588,102 +610,108 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
     "Eligibility",
   ];
   const patch = (v: Partial<Encounter>) => setForm({ ...form, ...v });
-  const save = (finalized = false) => {
-    const saved = {
+  const save = async (finalized = false) => {
+    const candidate = {
       ...form,
       finalized,
       status: finalized ? "complete" : "in_progress",
     };
-    update(
-      (s) => {
-        const tasks =
-          finalized && saved.decision !== "cleared"
-            ? [
-                {
-                  id: `followup-${saved.id}`,
-                  athleteId: saved.athleteId,
-                  title: "Participation follow-up required",
-                  status: "pending",
-                  date: saved.reviewDate,
-                  notes:
-                    "Coordinate the clinician-requested review. Clinical details remain in the authorized assessment.",
-                  assigned: "Faith Akinyi",
-                  kind: "follow_up",
-                },
-                ...s.records.tasks.filter(
-                  (t) => t.id !== `followup-${saved.id}`,
-                ),
-              ]
-            : s.records.tasks;
-        const reviews = finalized
-          ? s.records.reviews.map((r) =>
-              saved.reassessmentRequestIds?.includes(r.id) &&
-              r.status === "reassessment_requested"
-                ? { ...r, status: "completed", reviewedEncounterId: saved.id }
-                : r,
-            )
-          : s.records.reviews;
-        const next = { ...s, records: { ...s.records, tasks, reviews } };
-        const persisted =
-          finalized && saved.careReview
-            ? {
-                ...saved,
-                careReview: {
-                  ...saved.careReview,
-                  snapshot: careSnapshot(next, athlete.id),
-                },
-              }
-            : saved;
-        return {
-          ...next,
-          encounters: s.encounters.map((e) =>
-            e.id === saved.id ? persisted : e,
-          ),
-          athletes: finalized
-            ? s.athletes.map((a) =>
-                a.id === saved.athleteId
-                  ? {
-                      ...a,
-                      eligibilityStatus: saved.decision,
-                      nextReview: saved.reviewDate,
-                      readiness:
-                        saved.decision === "cleared"
-                          ? "ready"
-                          : [
-                                "cleared_with_monitoring",
-                                "sport_specific_restriction",
-                              ].includes(saved.decision)
-                            ? "ready_with_restrictions"
-                            : saved.decision === "pending_evaluation"
-                              ? "under_review"
-                              : "not_ready",
-                    }
-                  : a,
+    try {
+      const saved = (await (finalized
+        ? ppeApi.finalizeAssessment(form.id, candidate as unknown as Record<string, unknown>)
+        : ppeApi.saveAssessment(form.id, candidate as unknown as Record<string, unknown>))) as unknown as Encounter;
+      update(
+        (s) => {
+          const tasks =
+            finalized && saved.decision !== "cleared"
+              ? [
+                  {
+                    id: `followup-${saved.id}`,
+                    athleteId: saved.athleteId,
+                    title: "Participation follow-up required",
+                    status: "pending",
+                    date: saved.reviewDate,
+                    notes:
+                      "Coordinate the clinician-requested review. Clinical details remain in the authorized assessment.",
+                    assigned: "Faith Akinyi",
+                    kind: "follow_up",
+                  },
+                  ...s.records.tasks.filter(
+                    (t) => t.id !== `followup-${saved.id}`,
+                  ),
+                ]
+              : s.records.tasks;
+          const reviews = finalized
+            ? s.records.reviews.map((r) =>
+                saved.reassessmentRequestIds?.includes(r.id) &&
+                r.status === "reassessment_requested"
+                  ? { ...r, status: "completed", reviewedEncounterId: saved.id }
+                  : r,
               )
-            : s.athletes,
-        };
-      },
-      finalized
-        ? `Eligibility finalized for ${athlete.id}`
-        : `Assessment draft saved for ${athlete.id}`,
-      "clinician",
-      `assessments/${form.id}`,
-      finalized
-        ? [
-            "clinician",
-            ...(athlete.id === state.athleteId ? ["athlete" as Role] : []),
-            ...(athlete.id === state.guardianId ? ["guardian" as Role] : []),
-          ]
-        : ["clinician"],
-    );
-    setForm(saved);
-    setConfirm(false);
-    toast.success(
-      finalized
-        ? "Clinical decision finalized in demo"
-        : "Assessment draft saved",
-    );
+            : s.records.reviews;
+          const next = { ...s, records: { ...s.records, tasks, reviews } };
+          const persisted =
+            finalized && saved.careReview
+              ? {
+                  ...saved,
+                  careReview: {
+                    ...saved.careReview,
+                    snapshot: careSnapshot(next, athlete.id),
+                  },
+                }
+              : saved;
+          return {
+            ...next,
+            encounters: [
+              persisted,
+              ...s.encounters.filter((e) => e.id !== saved.id),
+            ],
+            athletes: finalized
+              ? s.athletes.map((a) =>
+                  a.id === saved.athleteId
+                    ? {
+                        ...a,
+                        eligibilityStatus: saved.decision,
+                        nextReview: saved.reviewDate,
+                        readiness:
+                          saved.decision === "cleared"
+                            ? "ready"
+                            : [
+                                  "cleared_with_monitoring",
+                                  "sport_specific_restriction",
+                                ].includes(saved.decision)
+                              ? "ready_with_restrictions"
+                              : saved.decision === "pending_evaluation"
+                                ? "under_review"
+                                : "not_ready",
+                      }
+                    : a,
+                )
+              : s.athletes,
+          };
+        },
+        finalized
+          ? `Eligibility finalized for ${athlete.id}`
+          : `Assessment draft saved for ${athlete.id}`,
+        "clinician",
+        `assessments/${saved.id}`,
+        finalized
+          ? [
+              "clinician",
+              ...(athlete.id === state.athleteId ? ["athlete" as Role] : []),
+              ...(athlete.id === state.guardianId ? ["guardian" as Role] : []),
+              ...(saved.decision !== "cleared" ? ["physiotherapist" as Role] : []),
+            ]
+          : ["clinician"],
+      );
+      setForm(saved);
+      setConfirm(false);
+      toast.success(finalized ? "Clinical decision finalized" : "Assessment draft saved");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save assessment");
+    }
   };
+
   if (form.finalized)
     return (
       <>
@@ -1012,7 +1040,7 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
           <DialogHeader>
             <DialogTitle>Finalize participation decision?</DialogTitle>
             <DialogDescription>
-              The demo certificate and participation views will use this signed
+              The certificate and participation views will use this signed
               decision. Start a new assessment for a later clinical decision.
             </DialogDescription>
           </DialogHeader>
@@ -1060,7 +1088,7 @@ export function Eligibility({
                 title={fullName(a)}
                 description={`${a.id} • ${a.currentOrganization?.name} • ${a.currentSport?.name}`}
               >
-                <BadgeDemo />
+                <CertificateBadge />
                 <Status value={e.decision} />
                 <p className="text-sm">
                   {e.restrictions || "No restrictions recorded"}
@@ -1076,7 +1104,7 @@ export function Eligibility({
                   <dt>Clinician</dt>
                   <dd>{e.signature}</dd>
                   <dt>Verification</dt>
-                  <dd>DEMO-{e.id}</dd>
+                  <dd>{e.certificateCode || `SAFE-${e.id.slice(0, 8).toUpperCase()}`}</dd>
                 </dl>
                 <Export
                   name={`${a.id}-certificate.txt`}
@@ -1123,10 +1151,10 @@ export function Eligibility({
     </>
   );
 }
-function BadgeDemo() {
+function CertificateBadge() {
   return (
     <p className="rounded-lg bg-muted px-3 py-2 text-xs font-medium">
-      DEMO — Not a valid medical certificate
+      SafeSport verified participation certificate
     </p>
   );
 }
