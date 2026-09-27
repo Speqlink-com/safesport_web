@@ -182,6 +182,42 @@ export const systemAdminApi = {
     ),
 };
 
+export interface CareRecordPayload {
+  id?: string;
+  athleteId?: string;
+  title: string;
+  status: string;
+  date: string;
+  notes: string;
+  assigned: string;
+  kind: string;
+  outcome?: string;
+  coordination?: string;
+  urgency?: string;
+  progress?: number;
+  parentId?: string;
+  encounterId?: string;
+  referralId?: string;
+  reviewedEncounterId?: string;
+  file?: string;
+  fileName?: string;
+  extra?: Record<string, unknown>;
+}
+
+export interface CareWorkspacePayload {
+  records: Record<string, CareRecordPayload[]>;
+  notices: unknown[];
+}
+
+export const careApi = {
+  workspace: () => request<CareWorkspacePayload>("/care/workspace"),
+  saveRecord: (collection: string, payload: CareRecordPayload, id?: string) =>
+    request<CareRecordPayload>(id ? `/care/${collection}/${id}` : `/care/${collection}`, {
+      method: id ? "PUT" : "POST",
+      body: JSON.stringify(payload),
+    }),
+};
+
 export function dashboardForRole(role: string): string {
   return `/safesport/${role}`;
 }

@@ -82,6 +82,13 @@ export function Home({ role }: { role: Role }) {
     (e) => e.status === "scheduled",
   );
   const notices = state.notices.filter((n) => n.role === role && !n.read);
+  const finalizedAssessments = encounters.filter((e) => e.finalized);
+  const submittedAssessments = encounters.filter(
+    (e) => e.finalized || e.historySubmitted || e.reviewed || e.status !== "draft",
+  );
+  const assessmentTotal = finalizedAssessments.length
+    ? finalizedAssessments.length
+    : submittedAssessments.length;
   const screened = scopedRecords(state, role, "screenings");
   const authUser = useAuthStore((auth) => auth.user);
   const user =
@@ -196,7 +203,7 @@ export function Home({ role }: { role: Role }) {
         title={`Welcome, ${user.split(" ")[0] === "Dr" ? user : user.split(" ")[0]}`}
         description={
           role === "sys-admin"
-            ? "Manage demo access, configuration and technical metadata. Clinical content is excluded from this workspace."
+            ? "Manage access, configuration and technical metadata. Clinical content is excluded from this workspace."
             : personal(role)
               ? "Your care, progress and next steps in one place."
               : "A clear view of the people and actions that need your attention."
@@ -243,7 +250,7 @@ export function Home({ role }: { role: Role }) {
                     ? "Your participation summary"
                     : "Participation overview"
           }
-          description="Derived from the current demo records."
+          description="Derived from current SafeSport records."
         >
           <OverviewVisual role={role} />
         </Panel>
@@ -337,24 +344,22 @@ export function Home({ role }: { role: Role }) {
           ) : (
             <>
               <p className="text-3xl font-semibold">
-                {encounters.filter((e) => e.finalized).length}
+                {finalizedAssessments.length}
                 <span className="text-base font-normal text-muted-foreground">
                   {" "}
-                  / {encounters.length} assessments finalized
+                  / {assessmentTotal} assessments finalized
                 </span>
               </p>
               <Progress
                 value={
-                  encounters.length
-                    ? (encounters.filter((e) => e.finalized).length /
-                        encounters.length) *
-                      100
+                  assessmentTotal
+                    ? (finalizedAssessments.length / assessmentTotal) * 100
                     : 0
                 }
               />
               <p className="text-sm text-muted-foreground">
-                Incomplete consent and clinical stages remain pending until
-                reviewed.
+                Injury, rehabilitation and return-to-play updates appear as
+                your care team records them.
               </p>
               <Go
                 to={href(
@@ -365,6 +370,8 @@ export function Home({ role }: { role: Role }) {
                       ? "reports"
                       : role === "physiotherapist"
                         ? "progress"
+                        : role === "guardian"
+                        ? "health"
                         : "assessments",
                 )}
                 secondary

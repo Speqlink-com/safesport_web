@@ -116,16 +116,12 @@ export const navigation: Record<Role, Nav[]> = {
   guardian: [
     n("", "Overview", "home"),
     n("athletes", "Linked athletes", "athletes"),
-    n("health", "Health summary", "health"),
-    n("assessments", "Assessments", "assessments"),
-    n("injuries", "Injuries", "incidents"),
-    n("rehabilitation", "Rehabilitation", "rehabilitation"),
+    n("health", "Child progress", "health"),
     n("eligibility", "Participation status", "eligibility"),
-    n("consent", "Consent & assent", "consent"),
-    n("questionnaires", "Questionnaires", "questionnaires"),
+    n("consent", "Consent & privacy", "consent"),
     n("certificates", "Certificates", "certificates"),
-    n("documents", "Documents", "documents"),
-    ...common,
+    n("notifications", "Notifications", "notifications", "Connect"),
+    n("settings", "Settings", "settings", "Account"),
   ],
   clinician: [
     n("", "Overview", "home"),
@@ -330,44 +326,18 @@ export const navGroups: Record<Role, NavSection[]> = {
       ],
     },
     {
-      heading: "Linked Athletes",
+      heading: "Linked child",
       items: [
-        { kind: "link", path: "athletes", label: "Linked Athletes", icon: "Users" },
-        {
-          kind: "group",
-          label: "Health & Care",
-          icon: "HeartPulse",
-          defaultOpen: true,
-          children: [
-            { path: "health", label: "Health Summary", icon: "Heart" },
-            { path: "assessments", label: "Assessments", icon: "ClipboardList" },
-            { path: "injuries", label: "Injuries", icon: "Bandage" },
-            { path: "rehabilitation", label: "Rehabilitation", icon: "Dumbbell" },
-            { path: "eligibility", label: "Participation Status", icon: "ShieldCheck" },
-          ],
-        },
-        {
-          kind: "group",
-          label: "Consent & Privacy",
-          icon: "FileSignature",
-          children: [
-            { path: "consent", label: "Consent & Assent", icon: "FileCheck" },
-            { path: "questionnaires", label: "Questionnaires", icon: "FileQuestion" },
-          ],
-        },
-      ],
-    },
-    {
-      heading: "Documents",
-      items: [
+        { kind: "link", path: "athletes", label: "Linked Athlete", icon: "Users" },
+        { kind: "link", path: "health", label: "Child Progress", icon: "HeartPulse" },
+        { kind: "link", path: "eligibility", label: "Participation Status", icon: "ShieldCheck" },
+        { kind: "link", path: "consent", label: "Consent & Privacy", icon: "FileCheck" },
         { kind: "link", path: "certificates", label: "Certificates", icon: "Award" },
-        { kind: "link", path: "documents", label: "Documents", icon: "FolderOpen" },
       ],
     },
     {
       heading: "Account",
       items: [
-        { kind: "link", path: "messages", label: "Messages", icon: "MessageSquare" },
         { kind: "link", path: "notifications", label: "Notifications", icon: "Bell" },
         { kind: "link", path: "account", label: "Account", icon: "CircleUser" },
         { kind: "link", path: "settings", label: "Settings", icon: "SlidersHorizontal" },

@@ -46,6 +46,7 @@ import {
   Export,
 } from "./ui";
 import { Distribution } from "./distribution";
+import { careApi, AuthApiError } from "@/features/auth/api";
 const names: Record<Collection, string> = {
   referrals: "Referrals",
   screenings: "Movement screening",
@@ -210,7 +211,7 @@ export function Records({
     return (
       <Empty
         title="Record unavailable"
-        description="The record is not available in this role’s demo workspace."
+        description="The record is not available in this role’s workspace."
       >
         <Go to={href(role, path)}>Back to {names[collection].toLowerCase()}</Go>
       </Empty>
@@ -436,8 +437,7 @@ export function Records({
               {editing ? "Update" : "Create"} {names[collection].toLowerCase()}
             </DialogTitle>
             <DialogDescription>
-              Changes are local to this demo tab.{" "}
-              {operational && collection === "referrals"
+              Save updates to the SafeSport care record. {operational && collection === "referrals"
                 ? "Clinical reason and notes are restricted to the care team."
                 : ""}
             </DialogDescription>
@@ -470,7 +470,7 @@ function RecordForm({
   onClose: () => void;
   readOnly?: boolean;
 }) {
-  const { state, update } = useWorkspace();
+  const { state, setState } = useWorkspace();
   const athletes = visibleAthletes(state, role);
   const query = useSearchParams();
   const defaultAthlete =
@@ -505,7 +505,7 @@ function RecordForm({
   );
   const [closure, setClosure] = useState("");
   const patch = (v: Partial<RecordItem>) => setForm({ ...form, ...v });
-  function save() {
+  async function save() {
     if (
       collection === "referrals" &&
       form.status === "completed" &&
@@ -541,22 +541,27 @@ function RecordForm({
       toast.error("Choose a document to upload.");
       return;
     }
-    const saved = {
+    const payload = {
       ...form,
       encounterId:
         form.encounterId ||
         state.records.plans.find(
           (p) => p.id === form.parentId && p.athleteId === form.athleteId,
         )?.encounterId,
-      id: form.id || newId(collection.slice(0, 3)),
+      title: operational ? "Referral coordination" : form.title,
       notes:
         closure && !operational
           ? `${form.notes}\nClosure: ${closure}`
           : form.notes,
       coordination: operational && closure ? closure : form.coordination,
     };
-    update(
-      (s) => ({
+    try {
+      const saved = (await careApi.saveRecord(
+        collection,
+        payload,
+        initial?.id,
+      )) as RecordItem;
+      setState((s) => ({
         ...s,
         records: {
           ...s.records,
@@ -566,7 +571,14 @@ function RecordForm({
             ? {
                 plans: s.records.plans.map((p) =>
                   p.id === saved.parentId
-                    ? { ...p, progress: saved.progress ?? p.progress }
+                    ? {
+                        ...p,
+                        progress: saved.progress ?? p.progress,
+                        status:
+                          saved.progress !== undefined && saved.progress >= 100
+                            ? "completed"
+                            : p.status,
+                      }
                     : p,
                 ),
               }
@@ -576,33 +588,21 @@ function RecordForm({
             ...s.records[collection].filter((r) => r.id !== saved.id),
           ],
         },
-      }),
-      `${names[collection]} record ${initial ? "updated" : "created"}`,
-      role,
-      collection === "events"
-        ? "schedule"
-        : ["plans", "sessions", "reviews"].includes(collection)
-          ? "rehabilitation"
-          : collection,
-      ["clinician", "physiotherapist"].includes(role)
-        ? Array.from(
-            new Set<Role>([
-              role,
-              "operations",
-              ...(["referrals", "plans", "sessions", "reviews"].includes(
-                collection,
-              )
-                ? ["clinician" as Role]
-                : []),
-              ...Object.entries(identities)
-                .filter(([, user]) => user.name === saved.assigned)
-                .map(([r]) => r as Role),
-            ]),
-          )
-        : [role],
-    );
-    toast.success("Record saved in the demo");
-    onClose();
+        audit: [
+          {
+            id: newId("event"),
+            title: `${names[collection]} record ${initial ? "updated" : "created"}`,
+            actor: identities[role].name,
+            date: new Date().toISOString(),
+          },
+          ...s.audit,
+        ],
+      }));
+      toast.success("Record saved");
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof AuthApiError ? error.message : "Unable to save record");
+    }
   }
   if (readOnly)
     return (
@@ -991,8 +991,7 @@ export function Screenings({
           <DialogHeader>
             <DialogTitle>Capture movement screening</DialogTitle>
             <DialogDescription>
-              Local video preview only. No video is uploaded and no AI service
-              is invoked.
+              Video preview is local in this prototype. Reviewed screening records remain in the workspace.
             </DialogDescription>
           </DialogHeader>
           {open && (

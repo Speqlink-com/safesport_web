@@ -19,7 +19,7 @@ import {
 import type { Athlete, EligibilityStatus } from "../types";
 import { type Role, identities } from "./catalog";
 import type { DetailedHistory } from "./ppe-history";
-import { ppeApi } from "@/features/auth/api";
+import { careApi, ppeApi } from "@/features/auth/api";
 import { useAuthStore } from "@/features/auth/store";
 export const today = "2026-09-24";
 export const historyDomains = [
@@ -562,20 +562,31 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true;
     if (!authInitialized || !isAuthenticated || !authUser) return;
-    void ppeApi
-      .workspace()
-      .then((payload) => {
+    void Promise.all([ppeApi.workspace(), careApi.workspace()])
+      .then(([ppePayload, carePayload]) => {
         if (!active) return;
         setState((current) => {
-          const athletes = payload.athletes as State["athletes"];
+          const athletes = ppePayload.athletes as State["athletes"];
           const primaryAthlete = authUser.role === "athlete" ? authUser.id : athletes[0]?.id || current.athleteId;
           const guardianAthlete = authUser.role === "guardian" ? athletes[0]?.id || current.guardianId : current.guardianId;
+          const careRecords = carePayload.records as Partial<Record<Collection, RecordItem[]>>;
           return {
             ...current,
             athletes,
-            consents: payload.consents as State["consents"],
-            encounters: payload.encounters as State["encounters"],
-            notices: payload.notices as State["notices"],
+            consents: ppePayload.consents as State["consents"],
+            encounters: ppePayload.encounters as State["encounters"],
+            records: {
+              ...current.records,
+              referrals: careRecords.referrals ?? [],
+              incidents: careRecords.incidents ?? [],
+              plans: careRecords.plans ?? [],
+              sessions: careRecords.sessions ?? [],
+              reviews: careRecords.reviews ?? [],
+              events: careRecords.events ?? [],
+              tasks: careRecords.tasks ?? [],
+              documents: careRecords.documents ?? [],
+            },
+            notices: [...(ppePayload.notices as State["notices"]), ...(carePayload.notices as State["notices"])],
             athleteId: primaryAthlete,
             guardianId: guardianAthlete,
           };

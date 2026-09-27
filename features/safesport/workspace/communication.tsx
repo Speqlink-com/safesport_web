@@ -47,7 +47,7 @@ export function Notifications({ role }: { role: Role }) {
     <>
       <PageHeading
         title="Notifications"
-        description={`${identities[role].title} · Updates from your local demo workflows.`}
+        description={`${identities[role].title} · Updates from your SafeSport care workflows.`}
       >
         <Button
           variant="outline"
@@ -102,7 +102,7 @@ export function Notifications({ role }: { role: Role }) {
         ) : (
           <Empty
             title={search ? "No matching notifications" : "You’re up to date"}
-            description="New updates will appear when relevant demo records change."
+            description="New updates will appear when relevant care records change."
           />
         )}
       </Panel>

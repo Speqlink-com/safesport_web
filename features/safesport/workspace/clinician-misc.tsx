@@ -560,7 +560,7 @@ export function ClinicianNotifications() {
       <PageHeader
         eyebrow="Connect"
         title="Notifications"
-        description={`Clinician · Updates from your local demo workflows.${unreadCount > 0 ? ` ${unreadCount} unread.` : ""}`}
+        description={`Clinician · Updates from SafeSport care workflows.${unreadCount > 0 ? ` ${unreadCount} unread.` : ""}`}
       >
         <Button
           variant="outline"
@@ -602,7 +602,7 @@ export function ClinicianNotifications() {
       {notices.length === 0 ? (
         <AllClearState
           title={search ? "No matching notifications" : "You're up to date"}
-          description="New updates appear when relevant demo records change."
+          description="New updates appear when relevant care records change."
         />
       ) : (
         <div className="space-y-2">
