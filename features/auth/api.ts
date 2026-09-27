@@ -243,6 +243,13 @@ export const ppeApi = {
     request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}`, { method: "PUT", body: JSON.stringify(payload) }),
   finalizeAssessment: (assessmentId: string, payload: Record<string, unknown>) =>
     request<Record<string, unknown>>(`/ppe/assessments/${assessmentId}/finalize`, { method: "POST", body: JSON.stringify(payload) }),
+  deleteAssessment: (assessmentId: string) =>
+    request<{ detail: string; deleted: string[] }>(`/ppe/assessments/${assessmentId}`, { method: "DELETE" }),
+  deleteDraftAssessments: (assessmentIds: string[]) =>
+    request<{ detail: string; deleted: string[] }>("/ppe/assessments/delete-drafts", {
+      method: "POST",
+      body: JSON.stringify({ assessment_ids: assessmentIds }),
+    }),
   downloadCertificate: (assessmentId: string, filename = `safesport-certificate-${assessmentId}.pdf`) =>
     downloadFile(`/ppe/certificates/${assessmentId}`, filename),
   certificateUrl: (assessmentId: string) => `${API_URL}/ppe/certificates/${assessmentId}`,

@@ -472,9 +472,48 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
       athletes[0]?.id ||
       "",
   );
+  const [selectedDrafts, setSelectedDrafts] = useState<string[]>([]);
   const records = state.encounters.filter((e) =>
     athletes.some((a) => a.id === e.athleteId),
   );
+  const draftRecords = records.filter((e) => e.status === "draft" && !e.historySubmitted && !e.finalized);
+  const selectedDraftSet = new Set(selectedDrafts);
+  const allDraftsSelected = draftRecords.length > 0 && draftRecords.every((e) => selectedDraftSet.has(e.id));
+  const removeEncounters = (ids: string[]) => {
+    update(
+      (s) => ({
+        ...s,
+        encounters: s.encounters.filter((e) => !ids.includes(e.id)),
+      }),
+      ids.length === 1 ? "PPE assessment deleted" : `${ids.length} PPE drafts deleted`,
+      role,
+      "assessments",
+      [role],
+    );
+    setSelectedDrafts((current) => current.filter((id) => !ids.includes(id)));
+  };
+  const deleteOne = async (assessment: Encounter) => {
+    const label = fullName(athletes.find((a) => a.id === assessment.athleteId));
+    if (!window.confirm(`Delete PPE assessment for ${label}? This cannot be undone.`)) return;
+    try {
+      const result = await ppeApi.deleteAssessment(assessment.id);
+      removeEncounters(result.deleted.length ? result.deleted : [assessment.id]);
+      toast.success("Assessment deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete assessment");
+    }
+  };
+  const deleteSelectedDrafts = async () => {
+    if (!selectedDrafts.length) return;
+    if (!window.confirm(`Delete ${selectedDrafts.length} selected PPE draft${selectedDrafts.length === 1 ? "" : "s"}?`)) return;
+    try {
+      const result = await ppeApi.deleteDraftAssessments(selectedDrafts);
+      removeEncounters(result.deleted.length ? result.deleted : selectedDrafts);
+      toast.success("Selected drafts deleted");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to delete selected drafts");
+    }
+  };
   if (id && id !== "new") {
     const record = records.find((e) => e.id === id);
     if (!record)
@@ -517,21 +556,105 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
         <PPEProgress role={role} athleteId={athletes[0].id} />
       )}
       <Panel title="Assessment register">
-        <DataList
-          label="assessments"
-          rows={records.map((e) => ({
-            id: e.id,
-            name: fullName(athletes.find((a) => a.id === e.athleteId)),
-            status: e.status,
-            date: e.date,
-            detail: e.finalized
-              ? "Finalized by clinician"
-              : e.status === "draft"
-                ? "Athlete questionnaire draft — not submitted"
-                : "Clinical review pending",
-            to: href(role, `assessments/${e.id}`),
-          }))}
-        />
+        {role === "clinician" && (
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/30 p-3">
+            <label className="flex items-center gap-2 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="size-4 rounded border-border accent-primary"
+                checked={allDraftsSelected}
+                disabled={!draftRecords.length}
+                onChange={(event) =>
+                  setSelectedDrafts(event.target.checked ? draftRecords.map((e) => e.id) : [])
+                }
+              />
+              Select all drafts
+            </label>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={!selectedDrafts.length}
+              onClick={deleteSelectedDrafts}
+            >
+              Delete selected drafts{selectedDrafts.length ? ` (${selectedDrafts.length})` : ""}
+            </Button>
+          </div>
+        )}
+        {records.length ? (
+          <div className="overflow-hidden rounded-xl border border-border/70">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    {role === "clinician" && <th className="w-12 px-4 py-3">Draft</th>}
+                    <th className="px-4 py-3">Athlete</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Date</th>
+                    <th className="px-4 py-3">Details</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/70">
+                  {records.map((e) => {
+                    const isDraft = e.status === "draft" && !e.historySubmitted && !e.finalized;
+                    const athleteName = fullName(athletes.find((a) => a.id === e.athleteId));
+                    return (
+                      <tr key={e.id} className="bg-card/70 align-middle">
+                        {role === "clinician" && (
+                          <td className="px-4 py-3">
+                            <input
+                              type="checkbox"
+                              aria-label={`Select draft PPE assessment for ${athleteName}`}
+                              className="size-4 rounded border-border accent-primary"
+                              checked={selectedDraftSet.has(e.id)}
+                              disabled={!isDraft}
+                              onChange={(event) =>
+                                setSelectedDrafts((current) =>
+                                  event.target.checked
+                                    ? Array.from(new Set([...current, e.id]))
+                                    : current.filter((id) => id !== e.id),
+                                )
+                              }
+                            />
+                          </td>
+                        )}
+                        <td className="px-4 py-3 font-medium">{athleteName}</td>
+                        <td className="px-4 py-3"><Status value={e.status} /></td>
+                        <td className="px-4 py-3 text-muted-foreground">{e.date}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {e.finalized
+                            ? "Finalized by clinician"
+                            : isDraft
+                              ? "Athlete questionnaire draft — not submitted"
+                              : "Clinical review pending"}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex justify-end gap-2">
+                            <Go to={href(role, `assessments/${e.id}`)} secondary>
+                              Open
+                            </Go>
+                            {role === "clinician" && (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteOne(e)}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <Empty title="No PPE assessments" description="Assessments appear here after athlete onboarding starts." />
+        )}
       </Panel>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
