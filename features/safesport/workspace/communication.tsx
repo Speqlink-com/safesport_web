@@ -164,6 +164,19 @@ export function Messages({ role }: { role: Role }) {
   const conversations = workspace?.conversations ?? [];
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
   const people = workspace?.people.filter((person) => `${person.name} ${person.role}`.toLowerCase().includes(search.toLowerCase())) ?? [];
+  const globalMessaging = role === "clinician" || role === "physiotherapist" || role === "sys-admin";
+  const conversationLabel = (conversation: ConversationItem) =>
+    conversation.kind === "institution_group"
+      ? globalMessaging
+        ? conversation.title
+        : "Institution family group"
+      : conversation.title;
+  const conversationDescription = (conversation: ConversationItem) =>
+    conversation.kind === "institution_group"
+      ? globalMessaging
+        ? "Institution group"
+        : "Your one institution group"
+      : `${conversation.members.length} member${conversation.members.length === 1 ? "" : "s"}`;
   const clearFile = () => {
     if (attachment) URL.revokeObjectURL(attachment.url);
     setAttachment(null);
@@ -231,9 +244,9 @@ export function Messages({ role }: { role: Role }) {
               >
                 {conversation.kind === "institution_group" ? <Users /> : <MessageSquare />}
                 <span>
-                  {conversation.kind === "institution_group" ? "Institution family group" : conversation.title}
+                  {conversationLabel(conversation)}
                   <span className="block text-xs font-normal text-muted-foreground">
-                    {conversation.kind === "institution_group" ? "Your one institution group" : `${conversation.members.length} member${conversation.members.length === 1 ? "" : "s"}`}
+                    {conversationDescription(conversation)}
                   </span>
                 </span>
               </Button>
@@ -254,7 +267,7 @@ export function Messages({ role }: { role: Role }) {
             </div>
           </div>
         </Panel>
-        <Panel title={active?.kind === "institution_group" ? "Institution family group" : active?.title || "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime · double-click a message to reply` : "Select a conversation"}>
+        <Panel title={active ? conversationLabel(active) : "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime · double-click a message to reply` : "Select a conversation"}>
           <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96" aria-label="Conversation history" aria-live="polite">
             {!active?.messages.length && <Empty title="Start a conversation" description="Send a message or attach a file." />}
             {active?.messages.map((m) => (
