@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
-import { useEffect, useState } from "react";
-import { Send, Paperclip, CheckCheck, MessageSquare, X, Users } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Send, Paperclip, CheckCheck, MessageSquare, X, Users, Smile } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,8 @@ import { identities, href, type Role } from "./catalog";
 import { useWorkspace } from "./store";
 import { PageHeading, Panel, Empty, Go, Choice, Status } from "./ui";
 import { messagingApi, type ConversationItem, type MessageItem, type MessageUser } from "@/features/auth/api";
+import { useTheme } from "next-themes";
+import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 const contacts: Record<Role, Role[]> = {
   athlete: ["clinician", "physiotherapist", "coach"],
   guardian: ["clinician", "physiotherapist", "operations"],
@@ -123,6 +125,9 @@ export function Messages({ role }: { role: Role }) {
   const [fileKey, setFileKey] = useState(0);
   const [sending, setSending] = useState(false);
   const [replyTo, setReplyTo] = useState<MessageItem | null>(null);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const { resolvedTheme } = useTheme();
 
   const mergeWorkspace = (payload: { current_user: MessageUser; people: MessageUser[]; conversations: ConversationItem[] }, keepActive = true) => {
     setWorkspace(payload);
@@ -194,6 +199,16 @@ export function Messages({ role }: { role: Role }) {
         ? "Institution group"
         : "Your one institution group"
       : `${conversation.members.length} member${conversation.members.length === 1 ? "" : "s"}`;
+
+  useEffect(() => {
+    requestAnimationFrame(() => bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }));
+  }, [active?.id, active?.messages.length]);
+
+  const addEmoji = (emoji: EmojiClickData) => {
+    setText((current) => `${current}${emoji.emoji}`);
+    setEmojiOpen(false);
+  };
+
   const clearFile = () => {
     if (attachment) URL.revokeObjectURL(attachment.url);
     setAttachment(null);
@@ -212,6 +227,7 @@ export function Messages({ role }: { role: Role }) {
       setActiveId(conversation.id);
       setText("");
       setReplyTo(null);
+      setEmojiOpen(false);
       clearFile();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to open conversation");
@@ -233,6 +249,7 @@ export function Messages({ role }: { role: Role }) {
       } : current);
       setText("");
       setReplyTo(null);
+      setEmojiOpen(false);
       clearFile();
       toast.success("Message sent");
     } catch (error) {
@@ -297,6 +314,7 @@ export function Messages({ role }: { role: Role }) {
                 <p className="mt-2 text-[10px] text-muted-foreground">{m.created_at.slice(0, 16).replace("T", " · ")}</p>
               </article>
             ))}
+            <div ref={bottomRef} />
           </div>
           <form className="space-y-3 border-t border-border/50 pt-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
             {replyTo && (
@@ -308,7 +326,26 @@ export function Messages({ role }: { role: Role }) {
                 <Button type="button" variant="ghost" size="sm" onClick={() => setReplyTo(null)}>Cancel</Button>
               </div>
             )}
-            <Label htmlFor="message-text">Message</Label>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="message-text">Message</Label>
+              <div className="relative">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setEmojiOpen((open) => !open)} aria-label="Open emoji picker">
+                  <Smile />
+                  Emoji
+                </Button>
+                {emojiOpen && (
+                  <div className="absolute bottom-full right-0 z-50 mb-2 overflow-hidden rounded-xl border bg-background shadow-xl">
+                    <EmojiPicker
+                      onEmojiClick={addEmoji}
+                      theme={resolvedTheme === "dark" ? Theme.DARK : Theme.LIGHT}
+                      width={320}
+                      height={380}
+                      lazyLoadEmojis
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
             <Textarea id="message-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={replyTo ? "Write your reply…" : "Write a message…"} maxLength={5000} />
             {attachment && (
               <div className="rounded-lg border p-3">
