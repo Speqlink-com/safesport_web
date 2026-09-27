@@ -894,7 +894,6 @@ export function Profile({
               label: "Documents",
               content: <Records role={role} collection="documents" embedded />,
             },
-            { id: "security", label: "Security", content: <Security /> },
           ]}
         />
       </>
@@ -903,18 +902,9 @@ export function Profile({
     <>
       <PageHeading
         title="My account"
-        description={`${identities[role].title} · Changes apply to this demo identity only.`}
+        description={`${identities[role].title} · Personal account details from your SafeSport session.`}
       />
-      <Tabbed
-        tabs={[
-          {
-            id: "details",
-            label: "Details",
-            content: <AccountForm role={role} />,
-          },
-          { id: "security", label: "Security", content: <Security /> },
-        ]}
-      />
+      <AccountForm role={role} />
     </>
   );
 }
@@ -923,18 +913,29 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
   const authUser = useAuthStore((auth) => auth.user);
   const authName = authUser && authUser.role === role ? `${authUser.first_name} ${authUser.last_name}` : "";
   const authEmail = authUser && authUser.role === role ? authUser.email : "";
+  const profile = authUser && authUser.role === role ? authUser.profile_data : {};
+  const organizationName =
+    profile.organization_name ||
+    athlete?.currentOrganization?.name ||
+    athlete?.organizations?.[0]?.organization.name ||
+    "";
+  const sportName =
+    profile.sport_name ||
+    athlete?.currentTeam?.sport.name ||
+    athlete?.teams?.[0]?.sport.name ||
+    "";
   const [form, setForm] = useState(
     state.accounts[role] ?? {
       name: athlete ? fullName(athlete) : authName || identities[role].name,
       email: authEmail || identities[role].email,
-      phone: "",
+      phone: profile.phone || "",
     },
   );
   useEffect(() => {
     if (!athlete && authName && authEmail) {
-      setForm((current) => ({ ...current, name: authName, email: authEmail }));
+      setForm((current) => ({ ...current, name: authName, email: authEmail, phone: profile.phone || current.phone }));
     }
-  }, [athlete, authEmail, authName]);
+  }, [athlete, authEmail, authName, profile.phone]);
   return (
     <Panel title="Personal details">
       <form
@@ -983,6 +984,22 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
           value={form.phone}
           onChange={(v) => setForm({ ...form, phone: v })}
         />
+        {role === "athlete" && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Institution / school / club"
+              value={organizationName}
+              onChange={() => undefined}
+              disabled
+            />
+            <Field
+              label="Sport"
+              value={sportName}
+              onChange={() => undefined}
+              disabled
+            />
+          </div>
+        )}
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -991,7 +1008,7 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
                 state.accounts[role] ?? {
                   name: authName || identities[role].name,
                   email: authEmail || identities[role].email,
-                  phone: "",
+                  phone: profile.phone || "",
                 },
               )
             }

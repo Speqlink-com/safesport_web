@@ -14,6 +14,7 @@ export interface SessionUser {
   first_name: string;
   last_name: string;
   role: AuthRole;
+  profile_data: Record<string, string>;
 }
 
 export interface SessionResponse {
