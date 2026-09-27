@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +32,7 @@ import {
   Go,
   Tabbed,
 } from "./ui";
+import { systemAdminApi, type AdminUser } from "@/features/auth/api";
 export function Teams({ role, view }: { role: Role; view?: string }) {
   const { state, update } = useWorkspace();
   const [teamId, setTeamId] = useState("all");
@@ -347,13 +348,12 @@ const permissions: Record<Role, string> = {
     "User / access configuration, organization metadata and technical activity. No clinical content.",
 };
 export function Users({ role, view }: { role: Role; view?: string }) {
+  if (role === "sys-admin") return <SystemAdminUsers view={view} />;
   const { state, update } = useWorkspace();
   const [editing, setEditing] = useState<RecordItem | null>(null);
-  const canEdit = role === "sys-admin";
+  const canEdit = false;
   const records = state.records.users.filter(
-    (u) =>
-      role === "sys-admin" ||
-      [
+    (u) => [
         "coach",
         "institution",
         "clinician",
@@ -519,6 +519,239 @@ export function Users({ role, view }: { role: Role; view?: string }) {
                 Cancel
               </Button>
               <Button type="submit">Save access</Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+type UserDraft = {
+  id?: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: AdminUser["role"];
+  isActive: boolean;
+  password: string;
+};
+
+const emptyUserDraft: UserDraft = {
+  email: "",
+  firstName: "",
+  lastName: "",
+  role: "coach",
+  isActive: true,
+  password: "",
+};
+
+function SystemAdminUsers({ view }: { view?: string }) {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [editing, setEditing] = useState<UserDraft | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setUsers(await systemAdminApi.users());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to load users");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void systemAdminApi.users()
+      .then((rows) => {
+        if (active) setUsers(rows);
+      })
+      .catch((error) => {
+        if (active) toast.error(error instanceof Error ? error.message : "Unable to load users");
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const edit = (user: AdminUser) => {
+    setEditing({
+      id: user.id,
+      email: user.email,
+      firstName: user.first_name,
+      lastName: user.last_name,
+      role: user.role,
+      isActive: user.is_active,
+      password: "",
+    });
+  };
+
+  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!editing) return;
+    if (!editing.id && editing.password.length < 8) {
+      toast.error("Password must contain at least 8 characters");
+      return;
+    }
+    setIsSaving(true);
+    try {
+      if (editing.id) {
+        await systemAdminApi.updateUser(editing.id, {
+          first_name: editing.firstName,
+          last_name: editing.lastName,
+          role: editing.role,
+          is_active: editing.isActive,
+          ...(editing.password ? { password: editing.password } : {}),
+        });
+        toast.success("User updated");
+      } else {
+        await systemAdminApi.createUser({
+          email: editing.email,
+          first_name: editing.firstName,
+          last_name: editing.lastName,
+          role: editing.role,
+          password: editing.password,
+          is_active: editing.isActive,
+        });
+        toast.success("User created");
+      }
+      setEditing(null);
+      await load();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to save user");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <PageHeading
+        title={view === "roles" ? "Role permissions" : "Users & access"}
+        description="Create users and manage account access from the SafeSport database."
+      >
+        <Button onClick={() => setEditing({ ...emptyUserDraft })}>Create user</Button>
+      </PageHeading>
+      <Tabbed
+        initial={view === "roles" ? "permissions" : "users"}
+        tabs={[
+          {
+            id: "users",
+            label: "Directory",
+            content: (
+              <Panel title="People and access">
+                {isLoading ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Loading users…</p>
+                ) : users.length === 0 ? (
+                  <Empty title="No users yet" description="Create the first staff or portal account." />
+                ) : (
+                  <DataList
+                    label="users"
+                    rows={users.map((user) => ({
+                      id: user.id,
+                      name: `${user.first_name} ${user.last_name}`,
+                      status: user.is_active ? "active" : "suspended",
+                      detail: `${human(user.role)} · ${user.email}`,
+                      date: user.created_at.slice(0, 10),
+                      action: (
+                        <Button variant="outline" onClick={() => edit(user)}>
+                          Manage access
+                        </Button>
+                      ),
+                    }))}
+                  />
+                )}
+              </Panel>
+            ),
+          },
+          {
+            id: "permissions",
+            label: "Role boundaries",
+            content: (
+              <Panel
+                title="Workspace permissions"
+                description="Each role sees the information needed for its responsibilities."
+              >
+                <dl className="divide-y divide-border/50">
+                  {roles.map((r) => (
+                    <div key={r} className="grid gap-2 py-4 first:pt-0 last:pb-0 sm:grid-cols-[200px_1fr]">
+                      <dt className="text-sm font-semibold">{identities[r].title}</dt>
+                      <dd className="text-sm leading-6 text-muted-foreground">{permissions[r]}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Panel>
+            ),
+          },
+        ]}
+      />
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing?.id ? "Manage user" : "Create user"}</DialogTitle>
+            <DialogDescription>
+              User accounts are saved to the backend and can sign in with email, password and OTP.
+            </DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <form className="space-y-4" onSubmit={save}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="First name"
+                  value={editing.firstName}
+                  onChange={(value) => setEditing({ ...editing, firstName: value })}
+                  required
+                />
+                <Field
+                  label="Last name"
+                  value={editing.lastName}
+                  onChange={(value) => setEditing({ ...editing, lastName: value })}
+                  required
+                />
+              </div>
+              <Field
+                label="Email"
+                type="email"
+                value={editing.email}
+                onChange={(value) => setEditing({ ...editing, email: value })}
+                disabled={!!editing.id}
+                required
+              />
+              <Choice
+                label="Role"
+                value={editing.role}
+                onChange={(value) => setEditing({ ...editing, role: value as AdminUser["role"] })}
+                options={roles.map((item) => ({ value: item, label: identities[item].title }))}
+              />
+              <Choice
+                label="Access status"
+                value={editing.isActive ? "active" : "suspended"}
+                onChange={(value) => setEditing({ ...editing, isActive: value === "active" })}
+                options={[
+                  { value: "active", label: "Active" },
+                  { value: "suspended", label: "Suspended" },
+                ]}
+              />
+              <Field
+                label={editing.id ? "New password (optional)" : "Password"}
+                type="password"
+                value={editing.password}
+                onChange={(value) => setEditing({ ...editing, password: value })}
+                required={!editing.id}
+              />
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => setEditing(null)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSaving}>
+                  {isSaving ? "Saving…" : "Save user"}
+                </Button>
+              </div>
             </form>
           )}
         </DialogContent>

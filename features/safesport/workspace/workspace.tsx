@@ -198,7 +198,6 @@ const permitted: Record<Role, Surface[]> = {
     "profile",
     "messages",
     "notifications",
-    "teams",
     "organizations",
     "settings",
     "users",

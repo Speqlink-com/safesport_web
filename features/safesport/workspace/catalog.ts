@@ -221,7 +221,6 @@ export const navigation: Record<Role, Nav[]> = {
     n("users", "User management", "users"),
     n("roles", "Role permissions", "users"),
     n("organizations", "Organizations", "organizations"),
-    n("teams", "Teams", "teams"),
     n("config/sports", "Sport configuration", "config"),
     n("config/assessments", "Assessment configuration", "config"),
     n("config/workflows", "Workflow configuration", "config"),
@@ -760,7 +759,6 @@ export const navGroups: Record<Role, NavSection[]> = {
             { path: "users", label: "User Management", icon: "Users" },
             { path: "roles", label: "Role Permissions", icon: "KeyRound" },
             { path: "organizations", label: "Organizations", icon: "Building2" },
-            { path: "teams", label: "Teams", icon: "UsersRound" },
           ],
         },
         {

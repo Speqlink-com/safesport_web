@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -47,9 +47,27 @@ import { PPEProgress } from "./ppe-progress";
 import { ClinicianHome } from "./clinician-home";
 import Link from "next/link";
 import { OverviewVisual, RehabilitationVisual } from "./overview-visuals";
+import { systemAdminApi, type AdminOverview } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
 export function Home({ role }: { role: Role }) {
   // Hooks must be called unconditionally before any early return.
   const { state } = useWorkspace();
+  const [adminOverview, setAdminOverview] = useState<AdminOverview | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (role !== "sys-admin") return;
+    void systemAdminApi.overview()
+      .then((overview) => {
+        if (active) setAdminOverview(overview);
+      })
+      .catch(() => {
+        if (active) setAdminOverview(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [role]);
 
   // ── Clinician gets a dedicated redesigned overview ──────────────────────
   if ((role as string) === "clinician") return <ClinicianHome />;
@@ -70,28 +88,27 @@ export function Home({ role }: { role: Role }) {
     role === "sys-admin"
       ? [
           {
-            label: "Demo users",
-            value: state.records.users.length,
+            label: "Total users",
+            value: adminOverview?.total_users ?? state.records.users.length,
             path: "users",
             icon: UsersRound,
           },
           {
             label: "Active users",
-            value: state.records.users.filter((u) => u.status === "active")
-              .length,
+            value: adminOverview?.active_users ?? state.records.users.filter((u) => u.status === "active").length,
             path: "security/access",
             icon: ShieldCheck,
           },
           {
-            label: "Organizations",
-            value: state.organizations.length,
+            label: "Institutions",
+            value: adminOverview?.institutions ?? state.organizations.length,
             path: "organizations",
             icon: ClipboardList,
           },
           {
-            label: "Activity events",
-            value: state.audit.length,
-            path: "security/audit",
+            label: "Sports",
+            value: adminOverview?.sports ?? 0,
+            path: "config/sports",
             icon: CalendarDays,
           },
         ]
@@ -899,13 +916,21 @@ export function Profile({
 }
 function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
   const { state, update } = useWorkspace();
+  const authUser = useAuthStore((auth) => auth.user);
+  const authName = authUser && authUser.role === role ? `${authUser.first_name} ${authUser.last_name}` : "";
+  const authEmail = authUser && authUser.role === role ? authUser.email : "";
   const [form, setForm] = useState(
     state.accounts[role] ?? {
-      name: athlete ? fullName(athlete) : identities[role].name,
-      email: identities[role].email,
+      name: athlete ? fullName(athlete) : authName || identities[role].name,
+      email: authEmail || identities[role].email,
       phone: "",
     },
   );
+  useEffect(() => {
+    if (!athlete && authName && authEmail) {
+      setForm((current) => ({ ...current, name: authName, email: authEmail }));
+    }
+  }, [athlete, authEmail, authName]);
   return (
     <Panel title="Personal details">
       <form
@@ -960,8 +985,8 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
             onClick={() =>
               setForm(
                 state.accounts[role] ?? {
-                  name: identities[role].name,
-                  email: identities[role].email,
+                  name: authName || identities[role].name,
+                  email: authEmail || identities[role].email,
                   phone: "",
                 },
               )

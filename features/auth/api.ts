@@ -104,6 +104,43 @@ export interface CatalogInstitution {
   sports: CatalogSport[];
 }
 
+export interface AdminOverview {
+  total_users: number;
+  active_users: number;
+  institutions: number;
+  active_institutions: number;
+  sports: number;
+  active_sports: number;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role:
+    | "athlete"
+    | "guardian"
+    | "clinician"
+    | "physiotherapist"
+    | "coach"
+    | "institution"
+    | "operations"
+    | "sys-admin";
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface AdminUserPayload {
+  email?: string;
+  first_name: string;
+  last_name: string;
+  role: AdminUser["role"];
+  password?: string;
+  is_active: boolean;
+}
+
 export const catalogApi = {
   institutions: (search = "") =>
     request<CatalogInstitution[]>(`/catalog/institutions?search=${encodeURIComponent(search)}`),
@@ -111,6 +148,12 @@ export const catalogApi = {
 };
 
 export const systemAdminApi = {
+  overview: () => request<AdminOverview>("/admin/overview"),
+  users: () => request<AdminUser[]>("/admin/users"),
+  createUser: (payload: Required<Pick<AdminUserPayload, "email" | "password">> & AdminUserPayload) =>
+    request<AdminUser>("/admin/users", { method: "POST", body: JSON.stringify(payload) }),
+  updateUser: (id: string, payload: AdminUserPayload) =>
+    request<AdminUser>(`/admin/users/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
   institutions: () => request<CatalogInstitution[]>("/admin/institutions"),
   sports: () => request<CatalogSport[]>("/admin/sports"),
   createSport: (name: string) =>

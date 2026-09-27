@@ -35,10 +35,6 @@ export const sysAdminNavData = {
           title: "Organizations",
           url: "/dashboard/safesport/sys-admin/organizations",
         },
-        {
-          title: "Teams / Sports",
-          url: "/dashboard/safesport/sys-admin/teams",
-        },
       ],
     },
     {
