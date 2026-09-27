@@ -5,6 +5,8 @@ import Theme_Provider from "@/providers/theme-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WorkspaceProvider } from "@/features/safesport/workspace/store";
 import { Toaster } from "@/components/ui/sonner";
+import { Toaster as HotToaster } from "react-hot-toast";
+import { AuthBootstrap } from "@/features/auth/components";
 
 const interSans = Inter({
   variable: "--font-inter-sans",
@@ -32,10 +34,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className={`${interSans.className} h-full flex flex-col bg-background`}
       >
         <Theme_Provider>
+          <AuthBootstrap />
           <WorkspaceProvider>
             <TooltipProvider>{children}</TooltipProvider>
           </WorkspaceProvider>
           <Toaster />
+          <HotToaster position="top-right" toastOptions={{ duration: 4000 }} />
         </Theme_Provider>
       </body>
     </html>

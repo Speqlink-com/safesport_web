@@ -17,6 +17,7 @@ import {
 } from "../data/mock-data";
 import type { Athlete, EligibilityStatus } from "../types";
 import { type Role, identities } from "./catalog";
+import type { DetailedHistory } from "./ppe-history";
 export const today = "2026-09-24";
 export const historyDomains = [
   "Cardiovascular",
@@ -95,7 +96,7 @@ export interface Consent {
   at: string;
   version: string;
 }
-export interface Encounter {
+export interface Encounter extends DetailedHistory {
   id: string;
   athleteId: string;
   date: string;
@@ -116,6 +117,8 @@ export interface Encounter {
   rationale: string;
   signature: string;
   finalized: boolean;
+  careReview?: { snapshot: string; note: string };
+  reassessmentRequestIds?: string[];
 }
 export interface RecordItem {
   id: string;
@@ -131,6 +134,9 @@ export interface RecordItem {
   urgency?: string;
   progress?: number;
   parentId?: string;
+  encounterId?: string;
+  referralId?: string;
+  reviewedEncounterId?: string;
   file?: string;
   fileName?: string;
   quality?: string;

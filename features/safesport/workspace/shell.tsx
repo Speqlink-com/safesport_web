@@ -97,8 +97,10 @@ import {
   type NavItem,
   human,
 } from "./catalog";
-import { Choice } from "./ui";
 import { useWorkspace } from "./store";
+import { authApi } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
+import toast from "react-hot-toast";
 
 // ── Icon resolver ──────────────────────────────────────────────────────────
 // Maps string names (stored in catalog.ts) to Lucide components so catalog.ts
@@ -359,12 +361,26 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const { state } = useWorkspace();
   const { resolvedTheme, setTheme } = useTheme();
   const router = useRouter();
-  const user = state.accounts[role] ?? identities[role];
+  const workspaceUser = state.accounts[role] ?? identities[role];
+  const authUser = useAuthStore((auth) => auth.user);
+  const clearSession = useAuthStore((auth) => auth.clearSession);
+  const displayName = authUser ? `${authUser.first_name} ${authUser.last_name}` : workspaceUser.name;
   const unread = state.notices.filter((n) => n.role === role && !n.read).length;
   const current = path.split("/").slice(3).join("/");
   const title =
     navigation[role].find((n) => n.path === current)?.label ||
     human(current.split("/")[0] || "Overview");
+  const handleLogout = async () => {
+    try {
+      await authApi.logout();
+      toast.success("Signed out");
+    } catch {
+      toast.error("Your session ended locally");
+    } finally {
+      clearSession();
+      router.replace("/account/signin");
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -396,23 +412,13 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
           <Navigation role={role} />
         </SidebarContent>
 
-        {/* ── Footer: Demo switcher (kept for dev) ── */}
+        {/* ── Footer: authenticated role ── */}
         <SidebarFooter className="border-t px-4 py-3 space-y-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-            Demo workspace
+            Signed in as
           </p>
-          <Choice
-            label="Active role"
-            value={role}
-            onChange={(v) => router.push(href(v as Role))}
-            options={roles.map((r) => ({
-              value: r,
-              label: identities[r].title,
-            }))}
-          />
-          <p className="text-[10px] leading-4 text-muted-foreground">
-            Frontend demo · Changes reset on refresh.
-          </p>
+          <p className="text-sm font-medium">{displayName}</p>
+          <p className="text-[10px] leading-4 text-muted-foreground">{identities[role].title}</p>
         </SidebarFooter>
       </Sidebar>
 
@@ -466,20 +472,18 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
               role="link"
               render={<Link href={href(role, "account")} />}
               variant="ghost"
-              aria-label={`Account for ${user.name}`}
+              aria-label={`Account for ${displayName}`}
             >
               <CircleUserRound className="size-4" aria-hidden="true" />
               <span className="hidden max-w-36 truncate md:inline">
-                {user.name}
+                {displayName}
               </span>
             </Button>
             <Button
-              nativeButton={false}
-              role="link"
-              render={<Link href="/account/signin" />}
               variant="ghost"
               size="icon"
-              aria-label="Leave demo workspace"
+              aria-label="Sign out"
+              onClick={handleLogout}
             >
               <LogOut className="size-4" aria-hidden="true" />
             </Button>

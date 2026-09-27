@@ -1,6 +1,10 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { PPEProgress } from "./ppe-progress";
+import { PPEHistoryFields } from "./ppe-history-form";
+import { ppeQuestions, historyErrors } from "./ppe-history";
+import { useRouter, useSearchParams } from "next/navigation";
+import { careSnapshot, hasCare } from "./ppe-care";
 import { toast } from "sonner";
 import { ShieldCheck, AlertCircle, ClipboardCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,8 +24,6 @@ import {
   emptyEncounter,
   newId,
   today,
-  historyDomains,
-  historyPrompts,
   examDomains,
   baselineDomains,
   eligibilityOptions,
@@ -236,7 +238,10 @@ export function Questionnaire({
         />
       )}
       {selected && (
-        <QuestionnaireForm key={selected} role={role} athleteId={selected} />
+        <>
+          <QuestionnaireForm key={selected} role={role} athleteId={selected} />
+          <PPEProgress role={role} athleteId={selected} />
+        </>
       )}
     </div>
   );
@@ -257,6 +262,11 @@ function QuestionnaireForm({
     return role === "guardian"
       ? {
           ...initial,
+          historyAnswers: {
+            ...initial.historyAnswers,
+            mental: "private",
+            female: "private",
+          },
           history: {
             ...initial.history,
             "Mental health": "private",
@@ -265,16 +275,16 @@ function QuestionnaireForm({
         }
       : initial;
   });
-  const count = historyDomains.filter((d) => form.history[d]).length;
+  const count = ppeQuestions.filter((q) => form.historyAnswers?.[q.id]).length;
   const consent = state.consents[athleteId]?.clinical === "obtained";
   return (
     <Panel
       title="Health history"
       description="All domains require a response. Private answers are reviewed directly with a clinician."
     >
-      <Progress value={(count / historyDomains.length) * 100} />
+      <Progress value={(count / ppeQuestions.length) * 100} />
       <p className="text-sm text-muted-foreground">
-        {count} of {historyDomains.length} domains answered
+        {count} of {ppeQuestions.length} questions answered
       </p>
       {!consent && (
         <p role="status" className="rounded-lg bg-muted p-3">
@@ -289,16 +299,16 @@ function QuestionnaireForm({
         onSubmit={(e) => {
           e.preventDefault();
           if (!consent) return;
-          if (count < historyDomains.length) {
-            toast.error(
-              "Please answer every history domain, including unknown where appropriate.",
-            );
+          const errors = historyErrors(form);
+          if (errors.length) {
+            toast.error(errors[0]);
             return;
           }
           const saved = {
             ...form,
             id: form.id === "draft" ? newId("ppe") : form.id,
             status: "needs_review",
+            historySubmitted: true,
             reviewed: false,
           };
           update(
@@ -318,65 +328,13 @@ function QuestionnaireForm({
           toast.success("Questionnaire submitted for clinician review");
         }}
       >
-        {historyDomains.map((d) => (
-          <div key={d} className="space-y-3 rounded-xl border p-4">
-            <p className="text-sm leading-6 text-muted-foreground">
-              {historyPrompts[d]}
-            </p>
-            <Choice
-              label={d}
-              disabled={
-                role === "guardian" &&
-                ["Mental health", "Female athlete health"].includes(d)
-              }
-              value={
-                role === "guardian" &&
-                ["Mental health", "Female athlete health"].includes(d)
-                  ? "private"
-                  : form.history[d] || ""
-              }
-              onChange={(v) =>
-                setForm({ ...form, history: { ...form.history, [d]: v } })
-              }
-              options={[
-                "yes",
-                "no",
-                "unknown",
-                ...(["Mental health", "Female athlete health"].includes(d)
-                  ? [
-                      {
-                        value: "private",
-                        label: "Discuss privately with clinician",
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-            {form.history[d] === "yes" &&
-              !(
-                role === "guardian" &&
-                ["Mental health", "Female athlete health"].includes(d)
-              ) && (
-                <Notes
-                  label={`${d}: symptoms, timing, treatment and current limitations`}
-                  value={form.followups[d] || ""}
-                  onChange={(v) =>
-                    setForm({
-                      ...form,
-                      followups: { ...form.followups, [d]: v },
-                    })
-                  }
-                  required
-                />
-              )}
-            {form.history[d] === "private" && (
-              <p className="text-sm text-muted-foreground">
-                A confidential review is requested. No sensitive details are
-                needed here.
-              </p>
-            )}
-          </div>
-        ))}
+        <PPEHistoryFields
+          value={form}
+          guardian={role === "guardian"}
+          onChange={(patch) =>
+            setForm({ ...form, ...patch, historySubmitted: false })
+          }
+        />
         <div className="flex gap-2">
           <Button type="submit" disabled={!consent}>
             Submit for review
@@ -386,6 +344,9 @@ function QuestionnaireForm({
             onClick={() => {
               const saved = {
                 ...form,
+                status: "draft",
+                historySubmitted: false,
+                reviewed: false,
                 id: form.id === "draft" ? newId("ppe") : form.id,
               };
               update(
@@ -415,20 +376,9 @@ export function assessmentBlocks(e: Encounter, consent?: Consent) {
   const errors: string[] = [];
   if (consent?.clinical !== "obtained")
     errors.push("Clinical consent is required.");
-  if (historyDomains.some((d) => !e.history[d]))
-    errors.push("Complete every history domain.");
+  errors.push(...historyErrors(e, true));
   if (!e.reviewed)
     errors.push("A clinician must resolve and review history flags.");
-  if (
-    historyDomains.some(
-      (d) =>
-        ["yes", "unknown", "private"].includes(e.history[d]) &&
-        !e.followups[d]?.trim(),
-    )
-  )
-    errors.push(
-      "Document follow-up for positive, unknown and confidential answers.",
-    );
   if (examDomains.some((d) => !e.exam[d] || e.exam[d] === "not_assessed"))
     errors.push("Complete the examination; missing findings are not normal.");
   if (
@@ -483,8 +433,13 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
   const { state, update } = useWorkspace();
   const router = useRouter();
   const athletes = visibleAthletes(state, role);
+  const query = useSearchParams();
   const [open, setOpen] = useState(id === "new");
-  const [selected, setSelected] = useState(athletes[0]?.id || "");
+  const [selected, setSelected] = useState(
+    athletes.find((a) => a.id === query.get("athleteId"))?.id ||
+      athletes[0]?.id ||
+      "",
+  );
   const records = state.encounters.filter((e) =>
     athletes.some((a) => a.id === e.athleteId),
   );
@@ -526,6 +481,9 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
           <Button onClick={() => setOpen(true)}>Start assessment</Button>
         )}
       </PageHeading>
+      {personal(role) && athletes[0] && (
+        <PPEProgress role={role} athleteId={athletes[0].id} />
+      )}
       <Panel title="Assessment register">
         <DataList
           label="assessments"
@@ -536,7 +494,9 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
             date: e.date,
             detail: e.finalized
               ? "Finalized by clinician"
-              : "Clinical review pending",
+              : e.status === "draft"
+                ? "Athlete questionnaire draft — not submitted"
+                : "Clinical review pending",
             to: href(role, `assessments/${e.id}`),
           }))}
         />
@@ -566,14 +526,28 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
                 const active = state.encounters.find(
                   (e) => e.athleteId === selected && !e.finalized,
                 );
-                const e = active ?? emptyEncounter(newId("ppe"), selected);
-                if (!active)
-                  update(
-                    (s) => ({ ...s, encounters: [e, ...s.encounters] }),
-                    `Assessment started for ${selected}`,
-                    role,
-                    `assessments/${e.id}`,
-                  );
+                const e = {
+                  ...(active ?? emptyEncounter(newId("ppe"), selected)),
+                  reassessmentRequestIds: state.records.reviews
+                    .filter(
+                      (r) =>
+                        r.athleteId === selected &&
+                        r.status === "reassessment_requested",
+                    )
+                    .map((r) => r.id),
+                };
+                update(
+                  (s) => ({
+                    ...s,
+                    encounters: [
+                      e,
+                      ...s.encounters.filter((item) => item.id !== e.id),
+                    ],
+                  }),
+                  `Assessment started for ${selected}`,
+                  role,
+                  `assessments/${e.id}`,
+                );
                 setOpen(false);
                 router.push(href(role, `assessments/${e.id}`));
               }}
@@ -587,6 +561,7 @@ export function Assessments({ role, id }: { role: Role; id?: string }) {
   );
 }
 function AssessmentEditor({ initial }: { initial: Encounter }) {
+  const router = useRouter();
   const { state, update } = useWorkspace();
   const [form, setForm] = useState(initial);
   const [step, setStep] = useState(0);
@@ -594,6 +569,15 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
   const athlete = state.athletes.find((a) => a.id === form.athleteId)!;
   const consent = state.consents[athlete.id];
   const blocks = assessmentBlocks(form, consent);
+  const snapshot = careSnapshot(state, athlete.id);
+  const careRequired = hasCare(state, athlete.id);
+  if (
+    careRequired &&
+    (!form.careReview?.note.trim() || form.careReview.snapshot !== snapshot)
+  )
+    blocks.push(
+      "Review current referral and rehabilitation evidence, including outstanding care, before finalizing.",
+    );
   const stages = [
     "Consent",
     "History",
@@ -611,52 +595,74 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
       status: finalized ? "complete" : "in_progress",
     };
     update(
-      (s) => ({
-        ...s,
-        encounters: s.encounters.map((e) => (e.id === saved.id ? saved : e)),
-        records:
+      (s) => {
+        const tasks =
           finalized && saved.decision !== "cleared"
-            ? {
-                ...s.records,
-                tasks: [
-                  {
-                    id: `followup-${saved.id}`,
-                    athleteId: saved.athleteId,
-                    title: "Participation follow-up required",
-                    status: "pending",
-                    date: saved.reviewDate,
-                    notes:
-                      "Coordinate the clinician-requested review. Clinical details remain in the authorized assessment.",
-                    assigned: "Faith Akinyi",
-                    kind: "follow_up",
-                  },
-                  ...s.records.tasks.filter(
-                    (t) => t.id !== `followup-${saved.id}`,
-                  ),
-                ],
-              }
-            : s.records,
-        athletes: finalized
-          ? s.athletes.map((a) =>
-              a.id === saved.athleteId
-                ? {
-                    ...a,
-                    eligibilityStatus: saved.decision,
-                    nextReview: saved.reviewDate,
-                    readiness:
-                      saved.decision === "cleared"
-                        ? "ready"
-                        : saved.decision === "cleared_with_monitoring" ||
-                            saved.decision === "sport_specific_restriction"
-                          ? "ready_with_restrictions"
-                          : saved.decision === "pending_evaluation"
-                            ? "under_review"
-                            : "not_ready",
-                  }
-                : a,
+            ? [
+                {
+                  id: `followup-${saved.id}`,
+                  athleteId: saved.athleteId,
+                  title: "Participation follow-up required",
+                  status: "pending",
+                  date: saved.reviewDate,
+                  notes:
+                    "Coordinate the clinician-requested review. Clinical details remain in the authorized assessment.",
+                  assigned: "Faith Akinyi",
+                  kind: "follow_up",
+                },
+                ...s.records.tasks.filter(
+                  (t) => t.id !== `followup-${saved.id}`,
+                ),
+              ]
+            : s.records.tasks;
+        const reviews = finalized
+          ? s.records.reviews.map((r) =>
+              saved.reassessmentRequestIds?.includes(r.id) &&
+              r.status === "reassessment_requested"
+                ? { ...r, status: "completed", reviewedEncounterId: saved.id }
+                : r,
             )
-          : s.athletes,
-      }),
+          : s.records.reviews;
+        const next = { ...s, records: { ...s.records, tasks, reviews } };
+        const persisted =
+          finalized && saved.careReview
+            ? {
+                ...saved,
+                careReview: {
+                  ...saved.careReview,
+                  snapshot: careSnapshot(next, athlete.id),
+                },
+              }
+            : saved;
+        return {
+          ...next,
+          encounters: s.encounters.map((e) =>
+            e.id === saved.id ? persisted : e,
+          ),
+          athletes: finalized
+            ? s.athletes.map((a) =>
+                a.id === saved.athleteId
+                  ? {
+                      ...a,
+                      eligibilityStatus: saved.decision,
+                      nextReview: saved.reviewDate,
+                      readiness:
+                        saved.decision === "cleared"
+                          ? "ready"
+                          : [
+                                "cleared_with_monitoring",
+                                "sport_specific_restriction",
+                              ].includes(saved.decision)
+                            ? "ready_with_restrictions"
+                            : saved.decision === "pending_evaluation"
+                              ? "under_review"
+                              : "not_ready",
+                    }
+                  : a,
+              )
+            : s.athletes,
+        };
+      },
       finalized
         ? `Eligibility finalized for ${athlete.id}`
         : `Assessment draft saved for ${athlete.id}`,
@@ -686,7 +692,18 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
           description={`${fullName(athlete)} • ${form.id} • ${form.date}`}
         >
           <Go to={href("clinician", "assessments")}>All assessments</Go>
+          <Go
+            to={href("clinician", `assessments/new?athleteId=${athlete.id}`)}
+            secondary
+          >
+            Start reassessment
+          </Go>
         </PageHeading>
+        <PPEProgress
+          role="clinician"
+          athleteId={athlete.id}
+          encounterId={form.id}
+        />
         <Panel title="Clinician decision">
           <Status value={form.decision} />
           <p>{form.restrictions || "No activity restrictions recorded."}</p>
@@ -716,7 +733,27 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
         <Go to={href("clinician", `athletes/${athlete.id}`)} secondary>
           Close assessment
         </Go>
+        <Button
+          variant="outline"
+          onClick={() => {
+            save();
+            router.push(
+              href(
+                "clinician",
+                `referrals/new?athleteId=${athlete.id}&encounterId=${form.id}`,
+              ),
+            );
+          }}
+        >
+          Create linked referral
+        </Button>
       </PageHeading>
+      <PPEProgress
+        compact
+        role="clinician"
+        athleteId={athlete.id}
+        encounterId={form.id}
+      />
       <div className="flex flex-wrap gap-2" aria-label="Assessment steps">
         {stages.map((s, i) => (
           <Button
@@ -751,38 +788,7 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
                 clinician follow-up. Confidential notes are excluded from
                 operational and guardian views.
               </p>
-              {historyDomains.map((d) => (
-                <div key={d} className="space-y-3 border-b pb-4">
-                  <Choice
-                    label={d}
-                    value={form.history[d] || ""}
-                    onChange={(v) =>
-                      patch({
-                        history: { ...form.history, [d]: v },
-                        reviewed: false,
-                      })
-                    }
-                    options={["yes", "no", "unknown", "private"]}
-                  />
-                  {["yes", "unknown", "private"].includes(form.history[d]) && (
-                    <Notes
-                      label={`${d}: clinician follow-up and resolution`}
-                      value={form.followups[d] || ""}
-                      onChange={(v) =>
-                        patch({
-                          followups: { ...form.followups, [d]: v },
-                          reviewed: false,
-                        })
-                      }
-                    />
-                  )}
-                </div>
-              ))}
-              <Check
-                label="I have reviewed all history responses and resolved the flags with a documented plan."
-                checked={form.reviewed}
-                onChange={(v) => patch({ reviewed: v })}
-              />
+              <PPEHistoryFields value={form} clinician onChange={patch} />
             </>
           )}
           {step === 2 && (
@@ -891,6 +897,28 @@ function AssessmentEditor({ initial }: { initial: Encounter }) {
           )}
           {step === 6 && (
             <>
+              {careRequired && (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Review referral outcomes and rehabilitation progress.
+                    Explain how any outstanding care affects this decision. A
+                    certificate can include restrictions while care continues.
+                  </p>
+                  <Notes
+                    label="Care handoff review and disposition"
+                    value={form.careReview?.note || ""}
+                    onChange={(note) =>
+                      patch({ careReview: { snapshot, note } })
+                    }
+                  />
+                  <Go
+                    to={href("clinician", `athletes/${athlete.id}`)}
+                    secondary
+                  >
+                    Review athlete care records
+                  </Go>
+                </>
+              )}
               <Choice
                 label="Clinician eligibility decision"
                 value={form.decision}

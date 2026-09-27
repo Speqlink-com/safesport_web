@@ -332,6 +332,16 @@ export function Records({
                 Download {detail.fileName}
               </a>
             )}
+            {detail.encounterId && (
+              <p className="text-sm text-muted-foreground">
+                Linked PPE: {detail.encounterId}
+              </p>
+            )}
+            {detail.referralId && (
+              <p className="text-sm text-muted-foreground">
+                Source referral: {detail.referralId}
+              </p>
+            )}
             <div className="flex flex-wrap gap-2">
               {canEdit && (
                 <Button onClick={() => setEditing(detail)}>
@@ -346,7 +356,13 @@ export function Records({
               {collection === "referrals" &&
                 clinical(role) &&
                 detail.kind === "physiotherapy" && (
-                  <Go to={href(role, "rehabilitation")} secondary>
+                  <Go
+                    to={href(
+                      role,
+                      `rehabilitation?athleteId=${detail.athleteId}&referralId=${detail.id}&encounterId=${detail.encounterId || ""}`,
+                    )}
+                    secondary
+                  >
                     Rehabilitation workspace
                   </Go>
                 )}
@@ -468,6 +484,10 @@ function RecordForm({
       id: "",
       athleteId: defaultAthlete,
       parentId: query.get("source") || undefined,
+      encounterId: state.encounters.find(
+        (e) =>
+          e.id === query.get("encounterId") && e.athleteId === defaultAthlete,
+      )?.id,
       title: "",
       status: statusOptions[collection]?.[0] || "pending",
       date: today,
@@ -476,6 +496,10 @@ function RecordForm({
       kind: typeOptions[collection]?.[0] || collection,
       urgency: "routine",
       outcome: "",
+      referralId: state.records.referrals.find(
+        (r) =>
+          r.id === query.get("referralId") && r.athleteId === defaultAthlete,
+      )?.id,
       progress: 0,
     },
   );
@@ -519,6 +543,11 @@ function RecordForm({
     }
     const saved = {
       ...form,
+      encounterId:
+        form.encounterId ||
+        state.records.plans.find(
+          (p) => p.id === form.parentId && p.athleteId === form.athleteId,
+        )?.encounterId,
       id: form.id || newId(collection.slice(0, 3)),
       notes:
         closure && !operational
@@ -560,6 +589,11 @@ function RecordForm({
             new Set<Role>([
               role,
               "operations",
+              ...(["referrals", "plans", "sessions", "reviews"].includes(
+                collection,
+              )
+                ? ["clinician" as Role]
+                : []),
               ...Object.entries(identities)
                 .filter(([, user]) => user.name === saved.assigned)
                 .map(([r]) => r as Role),
@@ -595,8 +629,50 @@ function RecordForm({
         <Choice
           label="Athlete"
           value={form.athleteId || ""}
-          onChange={(v) => patch({ athleteId: v, parentId: undefined })}
+          onChange={(v) =>
+            patch({
+              athleteId: v,
+              parentId: undefined,
+              encounterId: undefined,
+              referralId: undefined,
+            })
+          }
           options={athletes.map((a) => ({ value: a.id, label: fullName(a) }))}
+        />
+      )}
+      {["referrals", "plans", "reviews"].includes(collection) &&
+        !operational && (
+          <Choice
+            label="Linked PPE assessment"
+            value={form.encounterId || "none"}
+            onChange={(v) =>
+              patch({ encounterId: v === "none" ? undefined : v })
+            }
+            options={[
+              { value: "none", label: "Athlete-level care (no PPE link)" },
+              ...state.encounters
+                .filter((e) => e.athleteId === form.athleteId)
+                .map((e) => ({ value: e.id, label: `${e.id} · ${e.date}` })),
+            ]}
+          />
+        )}
+      {collection === "plans" && (
+        <Choice
+          label="Source referral"
+          value={form.referralId || "none"}
+          onChange={(v) => {
+            const referral = state.records.referrals.find((r) => r.id === v);
+            patch({
+              referralId: referral?.id,
+              encounterId: referral?.encounterId || form.encounterId,
+            });
+          }}
+          options={[
+            { value: "none", label: "No referral link" },
+            ...scopedRecords(state, role, "referrals")
+              .filter((r) => r.athleteId === form.athleteId)
+              .map((r) => ({ value: r.id, label: `${r.id} · ${r.title}` })),
+          ]}
         />
       )}
       <Field

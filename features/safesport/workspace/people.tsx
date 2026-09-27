@@ -43,6 +43,7 @@ import {
 } from "./ui";
 import { Records, Rehabilitation, scopedRecords } from "./records";
 import { Assessments, Eligibility, ConsentScreen } from "./clinical";
+import { PPEProgress } from "./ppe-progress";
 import { ClinicianHome } from "./clinician-home";
 import Link from "next/link";
 import { OverviewVisual, RehabilitationVisual } from "./overview-visuals";
@@ -642,7 +643,18 @@ function AthleteRecord({ role, athlete: a }: { role: Role; athlete: Athlete }) {
       })),
   ];
   const tabs = [
-    { id: "overview", label: "Overview", content: overview },
+    {
+      id: "overview",
+      label: "Overview",
+      content: (
+        <>
+          {overview}
+          {(clinicalView || physio || permittedPersonal) && (
+            <PPEProgress role={role} athleteId={a.id} />
+          )}
+        </>
+      ),
+    },
     ...(clinicalView || physio || permittedPersonal
       ? [
           {

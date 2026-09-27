@@ -1,3 +1,4 @@
+import { ppeQuestions } from "../../features/safesport/workspace/ppe-history";
 import { test, expect, type Page } from "@playwright/test";
 import {
   navigation,
@@ -125,7 +126,7 @@ test("consent and PPE finalization remain gated", async ({ page }) => {
     page.getByRole("button", { name: "Finalize clinician decision" }),
   ).toBeDisabled();
   await expect(page.locator("main")).toContainText(
-    "Complete every history domain",
+    `Answer: ${ppeQuestions[0].label}`,
   );
 });
 test("health tabs render distinct views without navigation to screening", async ({
@@ -202,7 +203,46 @@ test("complete PPE updates guardian certificate without leaking clinical rationa
   page,
 }) => {
   test.setTimeout(120000);
-  await page.goto("/safesport/clinician/assessments/ppe-001");
+  await page.goto("/safesport/physiotherapist");
+  await page
+    .getByRole("link", { name: "Open rehabilitation", exact: true })
+    .click();
+  await page
+    .getByRole("tab", { name: "Progress reviews", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Add progress reviews", exact: true })
+    .click();
+  await choice(page, "Athlete", "Kevin Mutua");
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill("Kevin reassessment handoff");
+  await choice(page, "Status", "Reassessment Requested");
+  await page
+    .getByRole("textbox", {
+      name: "Plan / observations / instructions",
+      exact: true,
+    })
+    .fill(
+      "Specialist findings available; clinician participation review requested.",
+    );
+  await page.getByRole("button", { name: "Save record", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("row").filter({ hasText: "Kevin reassessment handoff" }),
+  ).toContainText("Reassessment Requested");
+  await choice(page, "Active role", "Clinician");
+  await page
+    .getByRole("link", { name: "Open assessments", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Start assessment", exact: true })
+    .click();
+  await choice(page, "Athlete", "Kevin Mutua");
+  await page
+    .getByRole("button", { name: "Open assessment", exact: true })
+    .click();
+  await expect(page).toHaveURL(/assessments\/ppe-001$/);
   await choice(page, "Clinical consent", "Obtained");
   await page.getByRole("checkbox", { name: /athlete has received/ }).check();
   await page
@@ -210,22 +250,7 @@ test("complete PPE updates guardian certificate without leaking clinical rationa
     .fill("Jane Mutua");
   await page.getByRole("button", { name: "Save consent" }).click();
   await page.getByRole("button", { name: "2. History" }).click();
-  for (const domain of [
-    "Cardiovascular",
-    "Family cardiac",
-    "Respiratory",
-    "Neurologic",
-    "Musculoskeletal",
-    "General medical",
-    "Allergy",
-    "Medication",
-    "Vision and hearing",
-    "Skin and infection",
-    "Mental health",
-    "Female athlete health",
-    "Previous restriction",
-  ])
-    await choice(page, domain, "No");
+  for (const question of ppeQuestions) await choice(page, question.label, "No");
   await page
     .getByRole("checkbox", { name: /I have reviewed all history/ })
     .check();
@@ -259,6 +284,11 @@ test("complete PPE updates guardian certificate without leaking clinical rationa
     .getByRole("textbox", { name: "Sport-specific review" })
     .fill("Clinical review of football demands completed.");
   await page.getByRole("button", { name: "7. Eligibility" }).click();
+  await page
+    .getByRole("textbox", { name: "Care handoff review and disposition" })
+    .fill(
+      "Reviewed existing care and specialist follow-up; documented participation decision with follow-up plan.",
+    );
   await choice(page, "Clinician eligibility decision", "Cleared");
   await page
     .getByRole("textbox", { name: "Clinical rationale (confidential)" })
@@ -274,6 +304,9 @@ test("complete PPE updates guardian certificate without leaking clinical rationa
   await expect(
     page.getByRole("heading", { name: "Assessment finalized" }),
   ).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(
+    "request(s) awaiting a new finalized clinical assessment.",
+  );
   await choice(page, "Active role", "Guardian");
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -287,6 +320,16 @@ test("complete PPE updates guardian certificate without leaking clinical rationa
   const pending = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export", exact: true }).click();
   expect((await pending).suggestedFilename()).toContain("ATH-00156");
+  await choice(page, "Active role", "Physiotherapist");
+  await page
+    .getByRole("link", { name: "Open rehabilitation", exact: true })
+    .click();
+  await page
+    .getByRole("tab", { name: "Progress reviews", exact: true })
+    .click();
+  await expect(
+    page.getByRole("row").filter({ hasText: "Kevin reassessment handoff" }),
+  ).toContainText("Completed");
 });
 
 test("athlete onboarding preserves edits and creates the connected profile", async ({

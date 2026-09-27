@@ -1,4 +1,5 @@
-import DemoAuth from "@/features/auth/components/DemoAuth";
-export default function Page() {
-  return <DemoAuth />;
+import { RegistrationVerify } from "@/features/auth/components";
+
+export default function GuardianVerifyPage() {
+  return <RegistrationVerify role="guardian" />;
 }

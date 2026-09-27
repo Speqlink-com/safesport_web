@@ -33,6 +33,7 @@ import {
   System,
 } from "./administration";
 import { useWorkspace } from "./store";
+import { SystemAdminInstitutions, SystemAdminSports } from "./institution-admin";
 const aliases: Partial<Record<string, Surface>> = {
   athletes: "athletes",
   roster: "athletes",
@@ -298,7 +299,7 @@ function WorkspaceRoute({ pathname }: { pathname: string }) {
     case "teams":
       return <Teams role={role} view={base} />;
     case "organizations":
-      return <Organizations role={role} />;
+      return role === "sys-admin" ? <SystemAdminInstitutions /> : <Organizations role={role} />;
     case "incidents":
       return <Records role={role} collection="incidents" id={safeId} />;
     case "tasks":
@@ -338,7 +339,7 @@ function WorkspaceRoute({ pathname }: { pathname: string }) {
     case "users":
       return <Users role={role} view={base} />;
     case "config":
-      return <Configuration role={role} view={path} />;
+      return role === "sys-admin" && path === "config/sports" ? <SystemAdminSports /> : <Configuration role={role} view={path} />;
     case "audit":
       return <Audit role={role} />;
     case "system":

@@ -35,5 +35,3 @@ export interface AuthResponse {
   user?: AuthUser;
   error?: string;
 }
-
-export type OAuthProvider = "google" | "facebook";
