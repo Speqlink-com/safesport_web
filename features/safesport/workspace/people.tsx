@@ -947,7 +947,7 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
           try {
             const session = await authApi.updateMe({
               first_name: firstName || form.name.trim(),
-              last_name: lastNameParts.join(" ") || "",
+              last_name: lastNameParts.join(" ") || authUser?.last_name || "-",
               phone: form.phone,
             });
             setSession(session.user);
@@ -967,8 +967,8 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
           label="Email"
           type="email"
           value={form.email}
-          onChange={(v) => setForm({ ...form, email: v })}
-          required
+          onChange={() => undefined}
+          disabled
         />
         <Field
           label="Phone"

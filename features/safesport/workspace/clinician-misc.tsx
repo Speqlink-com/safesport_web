@@ -35,7 +35,7 @@ X
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 Bar,
 BarChart,
@@ -47,6 +47,8 @@ XAxis,
 YAxis,
 } from "recharts";
 import { toast } from "sonner";
+import { authApi } from "@/features/auth/api";
+import { useAuthStore } from "@/features/auth/store";
 import { href,human,identities,roles } from "./catalog";
 import {
 AllClearState,
@@ -862,89 +864,75 @@ export function ClinicianMessages() {
 // ── Profile / Account ─────────────────────────────────────────────────────────
 
 export function ClinicianProfile() {
-  const { state, update } = useWorkspace();
+  const { state } = useWorkspace();
   const role = "clinician" as const;
-  const [activeTab, setActiveTab] = useState("details");
+  const authUser = useAuthStore((auth) => auth.user);
+  const setSession = useAuthStore((auth) => auth.setSession);
+  const authName = authUser && authUser.role === role ? `${authUser.first_name} ${authUser.last_name}` : "";
+  const authEmail = authUser && authUser.role === role ? authUser.email : "";
+  const profile = authUser && authUser.role === role ? authUser.profile_data : {};
   const [form, setForm] = useState(
     state.accounts[role] ?? {
-      name: identities[role].name,
-      email: identities[role].email,
-      phone: "",
+      name: authName || identities[role].name,
+      email: authEmail || identities[role].email,
+      phone: profile.phone || "",
     },
   );
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
 
-  const tabs = [
-    { id: "details", label: "Details" },
-    { id: "security", label: "Security" },
-  ];
+  useEffect(() => {
+    if (authName && authEmail) {
+      setForm((current) => ({ ...current, name: authName, email: authEmail, phone: profile.phone || current.phone }));
+    }
+  }, [authEmail, authName, profile.phone]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Account"
         title="My account"
-        description={`${identities[role].title} · Changes apply to this demo identity only.`}
+        description={`${identities[role].title} · Personal account details from your SafeSport session.`}
       />
-      <TabStrip tabs={tabs} active={activeTab} onChange={setActiveTab} />
 
-      {activeTab === "details" && (
-        <FormCard title="Personal details" description="Update your demo profile information.">
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              update(
-                (s) => ({ ...s, accounts: { ...s.accounts, [role]: form } }),
-                "Account details updated",
-                role,
-                "account",
-              );
-              toast.success("Demo profile updated");
-            }}
-          >
-            <Field label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-            <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
-            <Field label="Phone" type="tel" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                type="button"
-                onClick={() => setForm(state.accounts[role] ?? { name: identities[role].name, email: identities[role].email, phone: "" })}
-              >
-                Cancel changes
-              </Button>
-              <Button type="submit">Save profile</Button>
-            </div>
-          </form>
-        </FormCard>
-      )}
-
-      {activeTab === "security" && (
-        <FormCard title="Security preview" description="Authentication and credential storage are deferred. This form demonstrates validation only.">
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (password.length < 8 || password !== confirm) {
-                toast.error("Use at least 8 characters and matching passwords.");
-                return;
+      <FormCard title="Personal details" description="Update your profile details stored on your SafeSport account.">
+        <form
+          className="space-y-4"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const [firstName, ...lastNameParts] = form.name.trim().split(/\s+/);
+            try {
+              const session = await authApi.updateMe({
+                first_name: firstName || form.name.trim(),
+                last_name: lastNameParts.join(" ") || authUser?.last_name || "-",
+                phone: form.phone,
+              });
+              setSession(session.user);
+              toast.success("Profile updated");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Unable to update profile");
+            }
+          }}
+        >
+          <Field label="Full name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
+          <Field label="Email" type="email" value={form.email} onChange={() => undefined} disabled />
+          <Field label="Phone" type="tel" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() =>
+                setForm(state.accounts[role] ?? {
+                  name: authName || identities[role].name,
+                  email: authEmail || identities[role].email,
+                  phone: profile.phone || "",
+                })
               }
-              setPassword("");
-              setConfirm("");
-              toast.success("Validation complete — no credentials were changed or stored.");
-            }}
-          >
-            <Field label="New demo password" type="password" value={password} onChange={setPassword} required />
-            <Field label="Confirm demo password" type="password" value={confirm} onChange={setConfirm} required />
-            <Button type="submit">Preview password validation</Button>
-          </form>
-          <p className="mt-4 text-sm text-muted-foreground">
-            Two-factor authentication and session revocation require the future authentication service.
-          </p>
-        </FormCard>
-      )}
+            >
+              Cancel changes
+            </Button>
+            <Button type="submit">Save profile</Button>
+          </div>
+        </form>
+      </FormCard>
     </div>
   );
 }
