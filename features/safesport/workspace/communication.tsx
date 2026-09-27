@@ -122,6 +122,7 @@ export function Messages({ role }: { role: Role }) {
   const [attachment, setAttachment] = useState<{ file: File; url: string; name: string; type: string } | null>(null);
   const [fileKey, setFileKey] = useState(0);
   const [sending, setSending] = useState(false);
+  const [replyTo, setReplyTo] = useState<MessageItem | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -180,6 +181,7 @@ export function Messages({ role }: { role: Role }) {
       });
       setActiveId(conversation.id);
       setText("");
+      setReplyTo(null);
       clearFile();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to open conversation");
@@ -189,7 +191,8 @@ export function Messages({ role }: { role: Role }) {
     if (!active || (!text.trim() && !attachment)) return;
     setSending(true);
     try {
-      const message = await messagingApi.sendMessage(active.id, text.trim(), attachment?.file);
+      const replyPrefix = replyTo ? `Replying to ${replyTo.sender.name}: ${(replyTo.body || replyTo.attachment_name || "attachment").slice(0, 120)}\n\n` : "";
+      const message = await messagingApi.sendMessage(active.id, `${replyPrefix}${text.trim()}`, attachment?.file);
       setWorkspace((current) => current ? {
         ...current,
         conversations: current.conversations.map((conversation) =>
@@ -199,6 +202,7 @@ export function Messages({ role }: { role: Role }) {
         ),
       } : current);
       setText("");
+      setReplyTo(null);
       clearFile();
       toast.success("Message sent");
     } catch (error) {
@@ -227,9 +231,9 @@ export function Messages({ role }: { role: Role }) {
               >
                 {conversation.kind === "institution_group" ? <Users /> : <MessageSquare />}
                 <span>
-                  {conversation.title}
+                  {conversation.kind === "institution_group" ? "Institution family group" : conversation.title}
                   <span className="block text-xs font-normal text-muted-foreground">
-                    {conversation.members.length} member{conversation.members.length === 1 ? "" : "s"}
+                    {conversation.kind === "institution_group" ? "Your one institution group" : `${conversation.members.length} member${conversation.members.length === 1 ? "" : "s"}`}
                   </span>
                 </span>
               </Button>
@@ -250,11 +254,11 @@ export function Messages({ role }: { role: Role }) {
             </div>
           </div>
         </Panel>
-        <Panel title={active?.title || "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime` : "Select a conversation"}>
+        <Panel title={active?.kind === "institution_group" ? "Institution family group" : active?.title || "Messages"} description={active ? `${active.kind.replaceAll("_", " ")} · realtime · double-click a message to reply` : "Select a conversation"}>
           <div className="flex h-80 flex-col gap-4 overflow-y-auto bg-muted/20 p-3 sm:h-96" aria-label="Conversation history" aria-live="polite">
             {!active?.messages.length && <Empty title="Start a conversation" description="Send a message or attach a file." />}
             {active?.messages.map((m) => (
-              <article key={m.id} className={`max-w-[90%] rounded-xl border p-3 sm:max-w-[80%] ${m.sender.id === workspace?.current_user.id ? "self-end bg-primary/10" : "self-start bg-background"}`}>
+              <article key={m.id} onDoubleClick={() => setReplyTo(m)} className={`max-w-[90%] cursor-pointer rounded-xl border p-3 sm:max-w-[80%] ${m.sender.id === workspace?.current_user.id ? "self-end bg-primary/10" : "self-start bg-background"}`}>
                 <p className="mb-1 text-xs font-medium text-muted-foreground">{m.sender.name}</p>
                 {m.body && <p className="whitespace-pre-wrap break-words text-sm leading-6">{m.body}</p>}
                 {m.attachment_url && <Attachment url={m.attachment_url} name={m.attachment_name || "Attachment"} type={m.attachment_type || ""} />}
@@ -263,8 +267,17 @@ export function Messages({ role }: { role: Role }) {
             ))}
           </div>
           <form className="space-y-3 border-t border-border/50 pt-4" onSubmit={(e) => { e.preventDefault(); void send(); }}>
+            {replyTo && (
+              <div className="flex items-start justify-between gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
+                <div>
+                  <p className="font-medium">Replying to {replyTo.sender.name}</p>
+                  <p className="line-clamp-2 text-muted-foreground">{replyTo.body || replyTo.attachment_name || "Attachment"}</p>
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setReplyTo(null)}>Cancel</Button>
+              </div>
+            )}
             <Label htmlFor="message-text">Message</Label>
-            <Textarea id="message-text" value={text} onChange={(e) => setText(e.target.value)} placeholder="Write a message…" maxLength={5000} />
+            <Textarea id="message-text" value={text} onChange={(e) => setText(e.target.value)} placeholder={replyTo ? "Write your reply…" : "Write a message…"} maxLength={5000} />
             {attachment && (
               <div className="rounded-lg border p-3">
                 <Attachment url={attachment.url} name={attachment.name} type={attachment.type} />
