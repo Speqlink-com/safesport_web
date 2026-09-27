@@ -44,9 +44,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useAuthStore } from "@/features/auth/store";
 import { href, identities } from "./catalog";
 import { scopedRecords } from "./records";
-import { fullName, today, useWorkspace, visibleAthletes } from "./store";
+import { fullName, useWorkspace, visibleAthletes } from "./store";
 
 // ── Tiny design primitives ────────────────────────────────────────────────────
 
@@ -380,11 +381,20 @@ export function ClinicianHome() {
     (e) => e.status === "scheduled",
   );
   const notices = state.notices.filter((n) => n.role === role && !n.read);
-  const user = state.accounts[role]?.name || identities[role].name;
+  const authUser = useAuthStore((auth) => auth.user);
+  const user =
+    authUser?.role === role
+      ? `${authUser.first_name} ${authUser.last_name}`
+      : state.accounts[role]?.name || identities[role].name;
   const firstName =
     user.split(" ")[0] === "Dr"
       ? user.split(" ").slice(0, 2).join(" ")
       : user.split(" ")[0];
+  const displayDate = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date());
 
   // KPI values
   const openReferrals = referrals.filter(
@@ -617,7 +627,7 @@ export function ClinicianHome() {
             {/* Left: greeting + context */}
             <div className="space-y-1.5">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-                Clinician workspace · {today}
+                Clinician workspace · {displayDate}
               </p>
               <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
                 Good morning, {firstName}

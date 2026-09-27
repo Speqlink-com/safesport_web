@@ -88,6 +88,11 @@ export function Home({ role }: { role: Role }) {
     authUser?.role === role
       ? `${authUser.first_name} ${authUser.last_name}`
       : state.accounts[role]?.name || identities[role].name;
+  const displayDate = new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date());
   const stats =
     role === "sys-admin"
       ? [
@@ -187,7 +192,7 @@ export function Home({ role }: { role: Role }) {
   return (
     <>
       <PageHeading
-        eyebrow={`${identities[role].title} workspace · ${today}`}
+        eyebrow={`${identities[role].title} workspace · ${displayDate}`}
         title={`Welcome, ${user.split(" ")[0] === "Dr" ? user : user.split(" ")[0]}`}
         description={
           role === "sys-admin"
