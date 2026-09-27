@@ -62,6 +62,8 @@ export const authApi = {
     request<SessionResponse>("/auth/login/verify", { method: "POST", body: JSON.stringify({ code }) }),
   resendLoginOtp: () => request<{ detail: string }>("/auth/login/resend", { method: "POST" }),
   me: () => request<SessionResponse>("/auth/me"),
+  updateMe: (payload: { first_name: string; last_name: string; phone?: string }) =>
+    request<SessionResponse>("/auth/me", { method: "PUT", body: JSON.stringify(payload) }),
   refresh: () => request<SessionResponse>("/auth/refresh", { method: "POST" }),
   logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
   startRegistration: (payload: Record<string, unknown>) =>

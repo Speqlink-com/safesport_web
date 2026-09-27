@@ -47,7 +47,7 @@ import { PPEProgress } from "./ppe-progress";
 import { ClinicianHome } from "./clinician-home";
 import Link from "next/link";
 import { OverviewVisual, RehabilitationVisual } from "./overview-visuals";
-import { systemAdminApi, type AdminOverview } from "@/features/auth/api";
+import { authApi, systemAdminApi, type AdminOverview } from "@/features/auth/api";
 import { useAuthStore } from "@/features/auth/store";
 export function Home({ role }: { role: Role }) {
   // Hooks must be called unconditionally before any early return.
@@ -909,8 +909,9 @@ export function Profile({
   );
 }
 function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
-  const { state, update } = useWorkspace();
+  const { state } = useWorkspace();
   const authUser = useAuthStore((auth) => auth.user);
+  const setSession = useAuthStore((auth) => auth.setSession);
   const authName = authUser && authUser.role === role ? `${authUser.first_name} ${authUser.last_name}` : "";
   const authEmail = authUser && authUser.role === role ? authUser.email : "";
   const profile = authUser && authUser.role === role ? authUser.profile_data : {};
@@ -940,29 +941,20 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
     <Panel title="Personal details">
       <form
         className="space-y-4"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          update(
-            (s) => ({
-              ...s,
-              accounts: { ...s.accounts, [role]: form },
-              athletes: athlete
-                ? s.athletes.map((a) =>
-                    a.id === athlete.id
-                      ? {
-                          ...a,
-                          firstName: form.name.split(" ")[0],
-                          lastName: form.name.split(" ").slice(1).join(" "),
-                        }
-                      : a,
-                  )
-                : s.athletes,
-            }),
-            "Account details updated",
-            role,
-            "account",
-          );
-          toast.success("Demo profile updated");
+          const [firstName, ...lastNameParts] = form.name.trim().split(/\s+/);
+          try {
+            const session = await authApi.updateMe({
+              first_name: firstName || form.name.trim(),
+              last_name: lastNameParts.join(" ") || "",
+              phone: form.phone,
+            });
+            setSession(session.user);
+            toast.success("Profile updated");
+          } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Unable to update profile");
+          }
         }}
       >
         <Field
