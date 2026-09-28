@@ -26,27 +26,29 @@ export async function proxy(request: NextRequest) {
   if (normalized) return normalized;
 
   const { pathname } = request.nextUrl;
-  const hasAccessCookie = request.cookies.has(ACCESS_COOKIE);
-  const hasRefreshCookie = request.cookies.has(REFRESH_COOKIE);
+  const accessToken = request.cookies.get(ACCESS_COOKIE)?.value;
+  const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value;
+  const hasAccessCookie = Boolean(accessToken);
+  const hasValidRefreshCookie = isJwtUnexpired(refreshToken);
   const isDashboardRoute = pathname === "/safesport" || pathname.startsWith("/safesport/");
   const isAuthRoute = pathname.startsWith("/account/");
 
   if (pathname === "/") {
-    if (!hasAccessCookie && !hasRefreshCookie) return redirect(request, "/account/signin");
+    if (!hasAccessCookie && !hasValidRefreshCookie) return redirect(request, "/account/signin");
     const role = hasAccessCookie ? await sessionRole(request) : null;
     return redirect(request, role ? `/safesport/${role}` : "/safesport");
   }
 
   if (isDashboardRoute) {
-    if (!hasAccessCookie && !hasRefreshCookie) {
+    if (!hasAccessCookie && !hasValidRefreshCookie) {
       return redirect(request, `/account/signin?next=${encodeURIComponent(pathnameWithSearch(request))}`);
     }
 
-    if (!hasAccessCookie && hasRefreshCookie) return NextResponse.next();
+    if (!hasAccessCookie && hasValidRefreshCookie) return NextResponse.next();
 
     const role = await sessionRole(request);
     if (!role) {
-      if (hasRefreshCookie) return NextResponse.next();
+      if (hasValidRefreshCookie) return NextResponse.next();
       return redirect(request, `/account/signin?next=${encodeURIComponent(pathnameWithSearch(request))}`);
     }
 
@@ -60,10 +62,10 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isAuthRoute && (hasAccessCookie || hasRefreshCookie)) {
+  if (isAuthRoute && (hasAccessCookie || hasValidRefreshCookie)) {
     const role = hasAccessCookie ? await sessionRole(request) : null;
     if (role) return redirect(request, `/safesport/${role}`);
-    if (hasRefreshCookie) return redirect(request, "/safesport");
+    if (hasValidRefreshCookie) return redirect(request, "/safesport");
   }
 
   return NextResponse.next();
@@ -91,6 +93,25 @@ async function sessionRole(request: NextRequest): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+function isJwtUnexpired(token: string | undefined): boolean {
+  if (!token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const payload = JSON.parse(base64UrlDecode(parts[1])) as { exp?: number };
+    if (!payload.exp) return false;
+    return payload.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function base64UrlDecode(value: string): string {
+  const normalized = value.replaceAll("-", "+").replaceAll("_", "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return atob(padded);
 }
 
 function redirect(request: NextRequest, target: string): NextResponse {
