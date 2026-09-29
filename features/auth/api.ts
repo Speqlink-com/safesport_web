@@ -313,6 +313,75 @@ export const messagingApi = {
   wsUrl: (conversationId: string) => websocketUrl(`/messaging/ws/${conversationId}`),
 };
 
+export interface MovementSessionPayload {
+  title: string;
+  scheduled_at: string;
+  location: string;
+  drill: string;
+  camera_view: string;
+  instructions_html: string;
+}
+
+export interface MovementSessionItem extends MovementSessionPayload {
+  id: string;
+  institution_id: string | null;
+  institution_name: string;
+  status: string;
+  created_at: string;
+}
+
+export interface MovementScreeningItem {
+  id: string;
+  session_id: string | null;
+  athlete_id: string;
+  athlete_safesport_id: string;
+  athlete_name: string;
+  institution_id: string | null;
+  institution_name: string;
+  sport: string;
+  team: string;
+  drill: string;
+  camera_view: string;
+  status: string;
+  video_url: string;
+  video_public_id: string;
+  video_metadata: Record<string, unknown>;
+  ai_result: Record<string, unknown>;
+  clinician_review: Record<string, unknown>;
+  physio_review: Record<string, unknown>;
+  report_summary: string;
+  report_generated_at: string | null;
+  created_at: string;
+}
+
+export interface MovementWorkspacePayload {
+  sessions: MovementSessionItem[];
+  screenings: MovementScreeningItem[];
+  notices: unknown[];
+}
+
+export const movementApi = {
+  workspace: () => request<MovementWorkspacePayload>("/movement/workspace"),
+  createSession: (payload: MovementSessionPayload) =>
+    request<MovementSessionItem>("/movement/sessions", { method: "POST", body: JSON.stringify(payload) }),
+  createScreening: (payload: { athlete_safesport_id: string; session_id?: string; drill: string; camera_view: string }) =>
+    request<MovementScreeningItem>("/movement/screenings", { method: "POST", body: JSON.stringify(payload) }),
+  uploadVideo: (screeningId: string, video: File) => {
+    const form = new FormData();
+    form.set("video", video);
+    return request<{ video_url: string; video_public_id: string; metadata: Record<string, unknown> }>(`/movement/screenings/${screeningId}/video`, { method: "POST", body: form });
+  },
+  analyze: (screeningId: string) => request<MovementScreeningItem>(`/movement/screenings/${screeningId}/analyze`, { method: "POST" }),
+  clinicianReview: (screeningId: string, payload: { decision: string; interpretation: string; action: string; override_reason?: string }) =>
+    request<MovementScreeningItem>(`/movement/screenings/${screeningId}/clinician-review`, { method: "POST", body: JSON.stringify(payload) }),
+  physioReview: (screeningId: string, payload: { decision: string; interpretation: string; action: string; override_reason?: string }) =>
+    request<MovementScreeningItem>(`/movement/screenings/${screeningId}/physio-review`, { method: "POST", body: JSON.stringify(payload) }),
+  createReport: (screeningId: string, summary: string) =>
+    request<MovementScreeningItem>(`/movement/screenings/${screeningId}/report`, { method: "POST", body: JSON.stringify({ summary }) }),
+  downloadReport: (screeningId: string, filename = `safesport-ai-screening-${screeningId}.pdf`) =>
+    downloadFile(`/movement/screenings/${screeningId}/report.pdf`, filename),
+};
+
 export function dashboardForRole(role: string): string {
   return `/safesport/${role}`;
 }

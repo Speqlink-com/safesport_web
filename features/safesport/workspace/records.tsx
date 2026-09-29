@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, CalendarDays, Video } from "lucide-react";
+import { Plus, CalendarDays, Video, Bold, Italic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,7 +46,7 @@ import {
   Export,
 } from "./ui";
 import { Distribution } from "./distribution";
-import { careApi, reportsApi, AuthApiError, type ReportAthlete, type TermReportSummary } from "@/features/auth/api";
+import { careApi, reportsApi, movementApi, AuthApiError, type ReportAthlete, type TermReportSummary, type MovementScreeningItem } from "@/features/auth/api";
 import { useAuthStore } from "@/features/auth/store";
 const names: Record<Collection, string> = {
   referrals: "Referrals",
@@ -944,481 +944,176 @@ export function Screenings({
   id?: string;
   reviewOnly?: boolean;
 }) {
-  const { state } = useWorkspace();
+  const [screenings, setScreenings] = useState<MovementScreeningItem[]>([]);
   const [open, setOpen] = useState(id === "new");
-  let records = scopedRecords(state, role, "screenings");
-  if (personal(role))
-    records = records.filter(
-      (r) =>
-        r.status === "reviewed" || r.status === "included_in_report" || !r.risk,
-    );
-  if (reviewOnly)
-    records = records.filter((r) => r.status === "ready_for_review");
-  const detail =
-    id && id !== "new"
-      ? scopedRecords(state, role, "screenings").find((r) => r.id === id)
-      : undefined;
-  if (id && id !== "new")
+  const clinicalAccess = role === "clinician" || role === "physiotherapist" || role === "sys-admin";
+
+  const load = () =>
+    movementApi.workspace()
+      .then((payload) => setScreenings(payload.screenings))
+      .catch((error) => toast.error(error instanceof Error ? error.message : "Unable to load AI screenings"));
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const visible = screenings.filter((screening) => {
+    if (reviewOnly) return ["AWAITING_CLINICIAN_REVIEW", "REFERRED_TO_PHYSIO"].includes(screening.status);
+    if (clinicalAccess) return true;
+    return screening.status === "REPORT_READY";
+  });
+  const detail = id && id !== "new" ? screenings.find((screening) => screening.id === id) : undefined;
+
+  if (id && id !== "new") {
     return detail ? (
-      <ScreeningDetail role={role} initial={detail} />
+      <MovementScreeningDetail role={role} screening={detail} onChanged={(next) => setScreenings((rows) => rows.map((item) => item.id === next.id ? next : item))} />
     ) : (
-      <Empty title="Screening unavailable">
-        <Go to={href(role, role === "athlete" ? "screening" : "screenings")}>
-          Screening list
-        </Go>
+      <Empty title="Screening unavailable" description="This AI screening is outside your workspace or has not been reported yet.">
+        <Go to={href(role, role === "athlete" ? "screening" : "screenings")}>Screening list</Go>
       </Empty>
     );
+  }
+
   return (
     <>
       <PageHeading
-        title={reviewOnly ? "AI review queue" : "Movement screening"}
-        description="Movement-risk signals support clinical interpretation. They never determine medical eligibility."
+        title={reviewOnly ? "AI review queue" : "AI movement screening"}
+        description={clinicalAccess ? "Create athlete screening records, upload field videos, run decision-support analysis and publish athlete-safe reports." : "Final clinician-approved AI screening reports from SafeSport field sessions."}
       >
-        {clinical(role) && (
-          <Button onClick={() => setOpen(true)}>
-            <Video />
-            New screening
-          </Button>
+        {clinicalAccess && (
+          <Button onClick={() => setOpen(true)}><Video /> New AI screening</Button>
         )}
       </PageHeading>
-      <Panel title={reviewOnly ? "Awaiting human review" : "Screening history"}>
+      <Panel title={reviewOnly ? "Awaiting human review" : "Screening records"}>
         <DataList
-          label="screenings"
-          rows={records.map((r) => ({
-            id: r.id,
-            name: human(r.kind),
-            status: r.status,
-            detail: fullName(state.athletes.find((a) => a.id === r.athleteId)),
-            date: r.date,
-            to: href(
-              role,
-              `${role === "athlete" ? "screening" : reviewOnly ? "ai-reviews" : "screenings"}/${r.id}`,
-            ),
+          label="AI screenings"
+          rows={visible.map((screening) => ({
+            id: screening.id,
+            name: screening.athlete_name,
+            status: screening.status,
+            detail: `${screening.athlete_safesport_id} · ${screening.drill.replaceAll("_", " ")} · ${screening.institution_name || "SafeSport"}`,
+            date: screening.created_at.slice(0, 10),
+            to: href(role, `${role === "athlete" ? "screening" : reviewOnly ? "ai-reviews" : "screenings"}/${screening.id}`),
           }))}
         />
       </Panel>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Capture movement screening</DialogTitle>
-            <DialogDescription>
-              Video preview is local in this prototype. Reviewed screening records remain in the workspace.
-            </DialogDescription>
+            <DialogTitle>Create AI screening record</DialogTitle>
+            <DialogDescription>Search the athlete by SafeSport ID. The SafeSport field team uploads the video after capture.</DialogDescription>
           </DialogHeader>
-          {open && (
-            <ScreeningCapture role={role} onClose={() => setOpen(false)} />
-          )}
+          {open && <MovementScreeningCreateForm onCreated={(screening) => { setScreenings((rows) => [screening, ...rows]); setOpen(false); }} />}
         </DialogContent>
       </Dialog>
     </>
   );
 }
-function ScreeningCapture({
-  role,
-  onClose,
-}: {
-  role: Role;
-  onClose: () => void;
-}) {
-  const { state, update } = useWorkspace();
-  const authUser = useAuthStore((auth) => auth.user);
-  const currentUserName = userDisplayName(authUser) || identities[role].name;
-  const athletes = visibleAthletes(state, role);
-  const router = useRouter();
-  const [athleteId, setAthleteId] = useState(athletes[0]?.id || "");
-  const [drill, setDrill] = useState("jump_landing");
-  const [file, setFile] = useState<{ name: string; url: string } | null>(null);
-  const consent = state.consents[athleteId];
+
+function MovementScreeningCreateForm({ onCreated }: { onCreated: (screening: MovementScreeningItem) => void }) {
+  const [safeSportId, setSafeSportId] = useState("");
+  const [drill, setDrill] = useState("JUMP_LANDING");
+  const [cameraView, setCameraView] = useState("FRONTAL");
+  const [saving, setSaving] = useState(false);
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!file) return;
-        const r: RecordItem = {
-          id: newId("scr"),
-          athleteId,
-          title: human(drill),
-          kind: drill,
-          status: "draft",
-          quality: "pending",
-          date: today,
-          assigned: currentUserName,
-          notes: "",
-          file: file.url,
-          fileName: file.name,
-        };
-        update(
-          (s) => ({
-            ...s,
-            records: { ...s.records, screenings: [r, ...s.records.screenings] },
-          }),
-          "Movement screening captured",
-          role,
-          `screenings/${r.id}`,
-        );
-        onClose();
-        router.push(href(role, `screenings/${r.id}`));
-      }}
-    >
-      <Choice
-        label="Athlete"
-        value={athleteId}
-        onChange={(value) => {
-          setAthleteId(value);
-          if (file) URL.revokeObjectURL(file.url);
-          setFile(null);
-        }}
-        options={athletes.map((a) => ({ value: a.id, label: fullName(a) }))}
-      />
-      <Choice
-        label="Drill"
-        value={drill}
-        onChange={setDrill}
-        options={[
-          "jump_landing",
-          "single_leg_squat",
-          "sprint_acceleration",
-          "cutting_maneuver",
-          "kicking_mechanics",
-        ]}
-      />
-      <p className="rounded-lg bg-muted p-3 text-sm">
-        Target 1080p, 30 fps, camera 3–5 metres away. Use adequate lighting and
-        the configured frontal / sagittal view. Retake if keypoints are occluded
-        or the protocol is not followed.
-      </p>
-      {consent?.clinical !== "obtained" || !consent.video ? (
-        <p role="alert" className="text-sm text-destructive">
-          Clinical consent and separate video consent are required.
-        </p>
-      ) : (
-        <>
-          <Label htmlFor="screening-video">Movement video (up to 100 MB)</Label>
-          <Input
-            id="screening-video"
-            type="file"
-            accept="video/*"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              if (!f.type.startsWith("video/") || f.size > 100 * 1024 * 1024) {
-                toast.error("Select a video up to 100 MB.");
-                return;
-              }
-              if (file) URL.revokeObjectURL(file.url);
-              setFile({ name: f.name, url: URL.createObjectURL(f) });
-            }}
-          />
-          {file && (
-            <video
-              className="aspect-video w-full rounded-xl bg-black"
-              controls
-              src={file.url}
-              aria-label="Movement capture preview"
-            />
-          )}
-        </>
-      )}
-      <div className="flex gap-2">
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          disabled={!file || consent?.clinical !== "obtained" || !consent.video}
-        >
-          Save capture
-        </Button>
+    <form className="space-y-4" onSubmit={async (event) => {
+      event.preventDefault();
+      setSaving(true);
+      try {
+        const screening = await movementApi.createScreening({ athlete_safesport_id: safeSportId.trim().toUpperCase(), drill, camera_view: cameraView });
+        toast.success("AI screening record created");
+        onCreated(screening);
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Unable to create screening");
+      } finally {
+        setSaving(false);
+      }
+    }}>
+      <Field label="Athlete SafeSport ID" value={safeSportId} onChange={(value) => setSafeSportId(value.toUpperCase())} required />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Choice label="Drill" value={drill} onChange={setDrill} options={["JUMP_LANDING", "SINGLE_LEG_SQUAT", "SPRINT_ACCELERATION", "CUTTING", "KICKING"]} />
+        <Choice label="Camera view" value={cameraView} onChange={setCameraView} options={["FRONTAL", "SAGITTAL", "REAR", "MULTI_VIEW"]} />
       </div>
+      <Button type="submit" disabled={saving}>{saving ? "Creating…" : "Create screening"}</Button>
     </form>
   );
 }
-function ScreeningDetail({
-  role,
-  initial,
-}: {
-  role: Role;
-  initial: RecordItem;
-}) {
-  const { state, update } = useWorkspace();
-  const [form, setForm] = useState(initial);
-  const [processing, setProcessing] = useState(false);
-  const [reason, setReason] = useState("");
-  const clinicalAccess = clinical(role);
-  const save = (record: RecordItem, title: string) => {
-    setForm(record);
-    update(
-      (s) => ({
-        ...s,
-        records: {
-          ...s.records,
-          screenings: s.records.screenings.map((r) =>
-            r.id === record.id ? record : r,
-          ),
-        },
-      }),
-      title,
-      role,
-      `screenings/${record.id}`,
-    );
+
+function MovementScreeningDetail({ role, screening, onChanged }: { role: Role; screening: MovementScreeningItem; onChanged: (screening: MovementScreeningItem) => void }) {
+  const clinicalAccess = role === "clinician" || role === "physiotherapist" || role === "sys-admin";
+  const canClinicianReview = role === "clinician" || role === "sys-admin";
+  const canPhysioReview = role === "physiotherapist" || role === "clinician" || role === "sys-admin";
+  const [video, setVideo] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [interpretation, setInterpretation] = useState("AI output reviewed. Prepare prevention-focused feedback based on observed movement control.");
+  const [decision, setDecision] = useState("ACCEPT");
+  const [report, setReport] = useState(screening.report_summary || "Compact coach- and athlete-safe movement screening summary. Include what was screened, observed movement risk signal, prevention focus and next steps.");
+  const ai = screening.ai_result || {};
+  const findings = Array.isArray(ai.findings) ? ai.findings as string[] : [];
+
+  const update = async (action: () => Promise<MovementScreeningItem>, message: string) => {
+    setBusy(true);
+    try {
+      const next = await action();
+      onChanged(next);
+      toast.success(message);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to update screening");
+    } finally {
+      setBusy(false);
+    }
   };
-  const simulate = () => {
-    setProcessing(true);
-    setTimeout(() => {
-      save(
-        {
-          ...form,
-          status: "ready_for_review",
-          risk: "moderate",
-          model: "DEMO-2.3.1",
-          confidence: 0.82,
-          metrics: {
-            kneeValgusAngle: 15.3,
-            trunkLean: 12.1,
-            limbSymmetryIndex: 0.89,
-            stabilizationTime: 1.8,
-          },
-        },
-        "Demo movement result ready for human review",
-      );
-      setProcessing(false);
-    }, 800);
-  };
+
   return (
     <>
-      <PageHeading
-        title={human(form.kind)}
-        description={`${fullName(state.athletes.find((a) => a.id === form.athleteId))} • ${form.id} • ${form.date}`}
-      >
-        <Go
-          to={href(role, role === "athlete" ? "screening" : "screenings")}
-          secondary
-        >
-          All screenings
-        </Go>
+      <PageHeading title={`AI screening · ${screening.athlete_name}`} description={`${screening.athlete_safesport_id} · ${screening.drill.replaceAll("_", " ")} · ${screening.status}`}>
+        <Go to={href(role, role === "athlete" ? "screening" : "screenings")} secondary>All screenings</Go>
       </PageHeading>
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Movement capture">
-          <Status value={processing ? "processing" : form.status} />
-          {form.file ? (
-            <video
-              controls
-              className="aspect-video w-full rounded-xl bg-black"
-              src={form.file}
-              aria-label="Movement screening video"
-            />
+      <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+        <Panel title="Screening video and AI package" description="AI movement risk is decision support only. Clinician/physio interpretation remains authoritative.">
+          {screening.video_url ? (
+            <video className="aspect-video w-full rounded-xl bg-black" controls src={screening.video_url} />
+          ) : clinicalAccess ? (
+            <div className="space-y-3">
+              <Label htmlFor="ai-video">Upload field video</Label>
+              <Input id="ai-video" type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(event) => setVideo(event.target.files?.[0] ?? null)} />
+              <Button disabled={!video || busy} onClick={() => video && update(async () => { await movementApi.uploadVideo(screening.id, video); return movementApi.analyze(screening.id); }, "Video uploaded and AI analysis generated")}>Upload and analyze</Button>
+            </div>
           ) : (
-            <Empty
-              title="No video attached to this seed record"
-              description="Create a screening to preview a local video. Seed metrics are demonstration data."
-            />
+            <Empty title="Report pending" description="SafeSport clinicians will upload and review field videos before publishing the final report." />
           )}
-          <p className="text-sm">
-            Video quality: <Status value={form.quality || "pending"} />
-          </p>
-          {clinicalAccess && (
-            <>
-              <Choice
-                label="Capture quality"
-                value={form.quality || "pending"}
-                onChange={(v) =>
-                  save(
-                    {
-                      ...form,
-                      quality: v,
-                      status:
-                        v === "fail"
-                          ? "quality_failed"
-                          : form.status === "quality_failed"
-                            ? "draft"
-                            : form.status,
-                      risk: v === "fail" ? undefined : form.risk,
-                      metrics: v === "fail" ? undefined : form.metrics,
-                    },
-                    "Video quality reviewed",
-                  )
-                }
-                options={[
-                  { value: "pending", label: "Not yet assessed" },
-                  { value: "pass", label: "Usable" },
-                  { value: "fail", label: "Retake required" },
-                ]}
-              />
-              {form.quality === "fail" && (
-                <>
-                  <Notes
-                    label="Retake instructions"
-                    value={reason}
-                    onChange={setReason}
-                  />
-                  <Button
-                    disabled={!reason.trim()}
-                    onClick={() =>
-                      save({ ...form, notes: reason }, "Retake requested")
-                    }
-                  >
-                    Save retake instructions
-                  </Button>
-                </>
-              )}
-              {!["reviewed", "included_in_report"].includes(form.status) && (
-                <Button
-                  disabled={form.quality !== "pass" || processing}
-                  onClick={simulate}
-                >
-                  {processing
-                    ? "Preparing demo result…"
-                    : "Load simulated AI result"}
-                </Button>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Simulated metrics are a fixed demo fixture, not an analysis of
-                the uploaded video.
-              </p>
-            </>
+          {Object.keys(ai).length > 0 && (
+            <div className="mt-5 space-y-3 rounded-xl border bg-muted/30 p-4">
+              <div className="flex flex-wrap gap-2"><Status value={String(ai.risk_signal || "pending")} /><Status value={String((ai.quality as { status?: string } | undefined)?.status || "quality pending")} /></div>
+              <p className="text-sm text-muted-foreground">{String(ai.summary || "No AI summary yet.")}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm">{findings.map((finding) => <li key={finding}>{finding}</li>)}</ul>
+            </div>
           )}
         </Panel>
-        <Panel
-          title={clinicalAccess ? "Human interpretation" : "Reviewed summary"}
-          description="AI risk is a movement signal, not medical clearance."
-        >
-          {form.risk &&
-          form.quality !== "fail" &&
-          (clinicalAccess || form.reviewer) ? (
-            <>
-              <div className="flex gap-2">
-                <Status value={`${form.risk}_movement_risk`} />
-                <Status
-                  value={
-                    form.reviewer ? "human_reviewed" : "awaiting_human_review"
-                  }
-                />
-              </div>
-              {clinicalAccess && (
+        <Panel title={clinicalAccess ? "Human review and report" : "Final report"}>
+          {clinicalAccess ? (
+            <div className="space-y-4">
+              {(canClinicianReview || canPhysioReview) && (
                 <>
-                  <p className="text-sm">
-                    Model {form.model || "Not recorded"} · Confidence{" "}
-                    {form.confidence === undefined
-                      ? "Not measured"
-                      : `${Math.round(form.confidence * 100)}%`}
-                  </p>
-                  <dl className="grid grid-cols-2 gap-3 rounded-xl bg-muted p-4 text-sm">
-                    {[
-                      {
-                        key: "kneeValgusAngle",
-                        label: "Knee valgus",
-                        unit: "°",
-                      },
-                      { key: "trunkLean", label: "Trunk lean", unit: "°" },
-                      {
-                        key: "limbSymmetryIndex",
-                        label: "Limb symmetry index",
-                        unit: "",
-                      },
-                      {
-                        key: "stabilizationTime",
-                        label: "Stabilization",
-                        unit: " s",
-                      },
-                    ].map((m) => (
-                      <div key={m.key}>
-                        <dt className="text-muted-foreground">{m.label}</dt>
-                        <dd className="mt-1 font-medium">
-                          {form.metrics?.[m.key] === undefined
-                            ? "Not measured"
-                            : `${form.metrics[m.key]}${m.unit}`}
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                  <p className="text-xs text-muted-foreground">
-                    Drill: {human(form.kind)}. Interpret in protocol and capture
-                    context; no universal clinical cut-off is applied.
-                  </p>
+                  <Choice label="Review decision" value={decision} onChange={setDecision} options={canClinicianReview ? ["ACCEPT", "MODIFY", "REJECT", "REFER_PHYSIO"] : ["PHYSIO_REVIEWED"]} />
+                  <Notes label="Clinical / physiotherapy interpretation" value={interpretation} onChange={setInterpretation} />
+                  <Button disabled={busy || !interpretation.trim()} onClick={() => update(() => canClinicianReview ? movementApi.clinicianReview(screening.id, { decision, interpretation, action: "PREVENTION", override_reason: decision === "ACCEPT" || decision === "REFER_PHYSIO" ? "" : "Human reviewer adjusted the AI interpretation." }) : movementApi.physioReview(screening.id, { decision: "PHYSIO_REVIEWED", interpretation, action: "PREVENTION" }), "Review saved")}>Save review</Button>
                 </>
               )}
-              {clinicalAccess ? (
-                <form
-                  className="space-y-4"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    save(
-                      {
-                        ...form,
-                        status: "reviewed",
-                        reviewer: identities[role].name,
-                      },
-                      "Movement interpretation signed",
-                    );
-                    toast.success("Human review saved");
-                  }}
-                >
-                  <Notes
-                    label="Clinical interpretation / correction reason"
-                    value={form.interpretation || ""}
-                    onChange={(v) => setForm({ ...form, interpretation: v })}
-                    required
-                  />
-                  <Choice
-                    label="Reviewer action"
-                    value={form.action || ""}
-                    onChange={(v) => setForm({ ...form, action: v })}
-                    options={[
-                      "no_action",
-                      "prevention_program",
-                      "physiotherapy_referral",
-                      "further_assessment",
-                      "other",
-                    ]}
-                  />
-                  <Button
-                    type="submit"
-                    disabled={!form.action || !form.interpretation?.trim()}
-                  >
-                    Sign human review
-                  </Button>
-                  {form.action === "physiotherapy_referral" && (
-                    <Go
-                      to={href(
-                        role,
-                        `referrals/new?athleteId=${form.athleteId}&source=${form.id}`,
-                      )}
-                      secondary
-                    >
-                      Create referral
-                    </Go>
-                  )}
-                </form>
-              ) : (
-                <p className="text-sm">
-                  {form.interpretation ||
-                    "Your care team has reviewed this screening. Contact them for your care plan."}
-                </p>
-              )}
-              {form.reviewer && (
-                <p className="text-sm text-muted-foreground">
-                  Reviewed by {form.reviewer}
-                </p>
-              )}
-            </>
+              <Notes label="Final coach/athlete-safe report summary" value={report} onChange={setReport} />
+              <div className="flex flex-wrap gap-2"><Button disabled={busy || !report.trim()} onClick={() => update(() => movementApi.createReport(screening.id, report), "Report generated")}>Generate final report</Button><Button variant="outline" onClick={() => movementApi.downloadReport(screening.id).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to download report"))}>Download PDF</Button></div>
+            </div>
+          ) : screening.status === "REPORT_READY" ? (
+            <div className="space-y-4"><p className="text-sm leading-6 text-muted-foreground">{screening.report_summary || "Final SafeSport movement screening report is ready."}</p><Button onClick={() => movementApi.downloadReport(screening.id).catch((error) => toast.error(error instanceof Error ? error.message : "Unable to download report"))}>Download PDF report</Button></div>
           ) : (
-            <Empty
-              title={
-                form.quality === "fail" ? "Retake required" : "Result pending"
-              }
-              description={
-                form.quality === "fail"
-                  ? "No risk result is available for insufficient-quality video."
-                  : "A usable capture and human-reviewed result are required."
-              }
-            />
+            <Empty title="Awaiting SafeSport review" description="The report appears here after clinician and physiotherapy review." />
           )}
         </Panel>
       </div>
     </>
   );
 }
+
 export function Schedule({
   role,
   id,
@@ -1430,53 +1125,91 @@ export function Schedule({
 }) {
   const { state } = useWorkspace();
   const events = scopedRecords(state, role, "events");
+  const [sessionOpen, setSessionOpen] = useState(false);
+  const [sessions, setSessions] = useState<Awaited<ReturnType<typeof movementApi.workspace>>["sessions"]>([]);
+
+  useEffect(() => {
+    let active = true;
+    void movementApi.workspace().then((payload) => { if (active) setSessions(payload.sessions); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
   return (
-    <Records
-      role={role}
-      collection="events"
-      id={id}
-      view={view}
-      introduction={
-        !id && (
-          <Panel
-            title="Coming up"
-            description="All times are shown as entered in the demo (Africa/Nairobi)."
-          >
-            <div className="divide-y divide-border/50">
-              {events
-                .filter((e) => e.status === "scheduled")
-                .sort((a, b) => a.date.localeCompare(b.date))
-                .slice(0, 3)
-                .map((e) => (
-                  <div
-                    key={e.id}
-                    className="flex flex-wrap items-center gap-4 py-4 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <CalendarDays className="size-5 text-muted-foreground" />
+    <>
+      <Records
+        role={role}
+        collection="events"
+        id={id}
+        view={view}
+        introduction={
+          !id && (
+            <div className="space-y-6">
+              {role === "coach" && (
+                <Panel title="AI screening session" description="Create and broadcast a formatted SafeSport AI screening session to your institution, clinicians and physiotherapists.">
+                  <Button onClick={() => setSessionOpen(true)}><Plus /> New AI screening session</Button>
+                </Panel>
+              )}
+              <Panel title="AI screening sessions" description="Sessions broadcast through institution messaging and schedule notifications.">
+                <DataList
+                  label="AI screening sessions"
+                  rows={sessions.map((session) => ({
+                    id: session.id,
+                    name: session.title,
+                    status: session.status,
+                    date: session.scheduled_at || session.created_at.slice(0, 10),
+                    detail: `${session.drill.replaceAll("_", " ")} · ${session.location || "Location TBC"}`,
+                  }))}
+                />
+              </Panel>
+              <Panel title="Coming up" description="All times are shown as entered in the demo (Africa/Nairobi).">
+                <div className="divide-y divide-border/50">
+                  {events.filter((e) => e.status === "scheduled").sort((a, b) => a.date.localeCompare(b.date)).slice(0, 3).map((e) => (
+                    <div key={e.id} className="flex flex-wrap items-center gap-4 py-4 first:pt-0 last:pb-0">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/10"><CalendarDays className="size-5 text-muted-foreground" /></div>
+                      <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{e.date.replace("T", " · ")}</p><p className="mt-1 text-sm font-semibold">{e.title}</p></div>
+                      <Go to={href(role, `schedule/${e.id}`)} secondary>View appointment</Go>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs text-muted-foreground">
-                        {e.date.replace("T", " · ")}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold">{e.title}</p>
-                    </div>
-                    <Go to={href(role, `schedule/${e.id}`)} secondary>
-                      View appointment
-                    </Go>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                {!events.some((event) => event.status === "scheduled") && <Empty title="Nothing scheduled" description="Upcoming appointments will appear here when scheduled." />}
+              </Panel>
             </div>
-            {!events.some((event) => event.status === "scheduled") && (
-              <Empty
-                title="Nothing scheduled"
-                description="Upcoming appointments will appear here when scheduled."
-              />
-            )}
-          </Panel>
-        )
-      }
-    />
+          )
+        }
+      />
+      <Dialog open={sessionOpen} onOpenChange={setSessionOpen}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader><DialogTitle>New AI screening session</DialogTitle><DialogDescription>Broadcast a formatted session notice to your institution and care team.</DialogDescription></DialogHeader>
+          {sessionOpen && <AiSessionForm onSaved={(session) => { setSessions((current) => [session, ...current]); setSessionOpen(false); }} />}
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function AiSessionForm({ onSaved }: { onSaved: (session: Awaited<ReturnType<typeof movementApi.createSession>>) => void }) {
+  const [title, setTitle] = useState("SafeSport AI Screening Session");
+  const [scheduledAt, setScheduledAt] = useState("");
+  const [location, setLocation] = useState("");
+  const [drill, setDrill] = useState("JUMP_LANDING");
+  const [cameraView, setCameraView] = useState("FRONTAL");
+  const [instructions, setInstructions] = useState("<p><strong>Prepare athletes for standardized movement screening.</strong></p><p>Bring training shoes, ensure adequate lighting, and capture each drill at 1080p / 30fps where possible.</p>");
+  const [saving, setSaving] = useState(false);
+  const format = (command: "bold" | "italic") => document.execCommand(command);
+  return (
+    <form className="space-y-4" onSubmit={async (event) => {
+      event.preventDefault(); setSaving(true);
+      try {
+        const session = await movementApi.createSession({ title, scheduled_at: scheduledAt, location, drill, camera_view: cameraView, instructions_html: instructions });
+        toast.success("AI screening session broadcast"); onSaved(session);
+      } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to create session"); } finally { setSaving(false); }
+    }}>
+      <Field label="Session title" value={title} onChange={setTitle} required />
+      <div className="grid gap-3 sm:grid-cols-2"><Field label="When" type="datetime-local" value={scheduledAt} onChange={setScheduledAt} /><Field label="Location" value={location} onChange={setLocation} /></div>
+      <div className="grid gap-3 sm:grid-cols-2"><Choice label="Drill" value={drill} onChange={setDrill} options={["JUMP_LANDING", "SINGLE_LEG_SQUAT", "SPRINT_ACCELERATION", "CUTTING", "KICKING"]} /><Choice label="Camera view" value={cameraView} onChange={setCameraView} options={["FRONTAL", "SAGITTAL", "REAR", "MULTI_VIEW"]} /></div>
+      <div className="space-y-2"><Label>Formatted session instructions</Label><div className="flex gap-2"><Button type="button" variant="outline" onClick={() => format("bold")}><Bold className="size-4" /> Bold</Button><Button type="button" variant="outline" onClick={() => format("italic")}><Italic className="size-4" /> Italic</Button></div><div className="min-h-36 rounded-xl border bg-background p-3 text-sm leading-6" contentEditable suppressContentEditableWarning onInput={(event) => setInstructions(event.currentTarget.innerHTML)} dangerouslySetInnerHTML={{ __html: instructions }} /></div>
+      <Button type="submit" disabled={saving}>{saving ? "Broadcasting…" : "Create and broadcast"}</Button>
+    </form>
   );
 }
 export function Reports({
