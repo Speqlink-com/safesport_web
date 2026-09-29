@@ -132,6 +132,8 @@ export function Messages({ role }: { role: Role }) {
   const ingestWorkspace = useMessageAlertStore((state) => state.ingestWorkspace);
   const ingestMessage = useMessageAlertStore((state) => state.ingestMessage);
   const markMessagesRead = useMessageAlertStore((state) => state.markRead);
+  const markConversationRead = useMessageAlertStore((state) => state.markConversationRead);
+  const unreadConversationIds = useMessageAlertStore((state) => state.unreadConversationIds);
 
   const mergeWorkspace = (payload: { current_user: MessageUser; people: MessageUser[]; conversations: ConversationItem[] }, keepActive = true) => {
     ingestWorkspace(payload, { suppressUnread: true, suppressSound: true });
@@ -189,6 +191,11 @@ export function Messages({ role }: { role: Role }) {
 
   const conversations = workspace?.conversations ?? [];
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
+
+  useEffect(() => {
+    if (active?.id) markConversationRead(active.id);
+  }, [active?.id, markConversationRead]);
+
   const people = workspace?.people.filter((person) => `${person.name} ${person.role}`.toLowerCase().includes(search.toLowerCase())) ?? [];
   const globalMessaging = role === "clinician" || role === "physiotherapist" || role === "sys-admin";
   const conversationLabel = (conversation: ConversationItem) =>
@@ -281,8 +288,13 @@ export function Messages({ role }: { role: Role }) {
                 onClick={() => setActiveId(conversation.id)}
               >
                 {conversation.kind === "institution_group" ? <Users /> : <MessageSquare />}
-                <span>
-                  {conversationLabel(conversation)}
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate">{conversationLabel(conversation)}</span>
+                    {unreadConversationIds.includes(conversation.id) && active?.id !== conversation.id && (
+                      <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]" aria-label="Unread messages" />
+                    )}
+                  </span>
                   <span className="block text-xs font-normal text-muted-foreground">
                     {conversationDescription(conversation)}
                   </span>
