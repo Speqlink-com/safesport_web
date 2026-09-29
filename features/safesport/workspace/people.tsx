@@ -977,11 +977,11 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
         }}
       >
         {safeSportId && (
-          <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-background p-4">
+          <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-background p-4 dark:border-emerald-500/30 dark:from-emerald-950/45 dark:to-background">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">SafeSport ID</p>
-                <p className="mt-1 font-mono text-2xl font-semibold tracking-wide text-foreground">{safeSportId}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">SafeSport ID</p>
+                <p className="mt-1 font-mono text-2xl font-semibold tracking-wide text-foreground dark:text-emerald-50">{safeSportId}</p>
                 <p className="mt-1 text-xs text-muted-foreground">Use this ID for guardian linking and public certificate verification.</p>
               </div>
               <Button
