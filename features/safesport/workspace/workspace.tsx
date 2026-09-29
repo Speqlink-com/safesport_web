@@ -146,6 +146,7 @@ const permitted: Record<Role, Surface[]> = {
     "eligibility",
     "messages",
     "notifications",
+    "reports",
     "schedule",
     "teams",
     "incidents",

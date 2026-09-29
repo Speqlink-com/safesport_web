@@ -97,6 +97,7 @@ export function Home({ role }: { role: Role }) {
     authUser?.role === role
       ? `${authUser.first_name} ${authUser.last_name}`
       : state.accounts[role]?.name || identities[role].name;
+  const accountInstitution = authUser?.role === role ? authUser.profile_data?.organization_name || authUser.profile_data?.institution_name || "" : "";
   const displayDate = new Intl.DateTimeFormat(undefined, {
     year: "numeric",
     month: "short",
@@ -208,7 +209,9 @@ export function Home({ role }: { role: Role }) {
             ? "Manage access, configuration and technical metadata. Clinical content is excluded from this workspace."
             : personal(role)
               ? "Your care, progress and next steps in one place."
-              : "A clear view of the people and actions that need your attention."
+              : role === "coach" && accountInstitution
+                ? `${accountInstitution} athletes, schedules, certificates and progress reports.`
+                : "A clear view of the people and actions that need your attention."
         }
       >
         <Go to={href(role, primary)}>
@@ -239,6 +242,36 @@ export function Home({ role }: { role: Role }) {
           </Link>
         ))}
       </div>
+      {role === "coach" && (
+        <Panel
+          title={accountInstitution ? `${accountInstitution} coach view` : "Coach institution view"}
+          description="Real SafeSport records for athletes assigned to your institution."
+        >
+          <div className="grid gap-3 sm:grid-cols-4">
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Institution athletes</p>
+              <p className="mt-2 text-2xl font-semibold">{athletes.length}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Certificates</p>
+              <p className="mt-2 text-2xl font-semibold">{finalizedAssessments.length}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Scheduled</p>
+              <p className="mt-2 text-2xl font-semibold">{events.length}</p>
+            </div>
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">Incidents</p>
+              <p className="mt-2 text-2xl font-semibold">{scopedRecords(state, role, "incidents").length}</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Go to={href(role, "roster")} secondary>View athletes</Go>
+            <Go to={href(role, "reports")} secondary>Reports</Go>
+            <Go to={href(role, "schedule")} secondary>Schedule</Go>
+          </div>
+        </Panel>
+      )}
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <Panel
           title={
@@ -919,7 +952,11 @@ export function Profile({
     <>
       <PageHeading
         title="My account"
-        description={`${identities[role].title} · Personal account details from your SafeSport session.`}
+        description={
+          (role === "coach" || role === "institution") && useAuthStore.getState().user?.profile_data?.organization_name
+            ? `${identities[role].title} · ${useAuthStore.getState().user?.profile_data?.organization_name}`
+            : `${identities[role].title} · Personal account details from your SafeSport session.`
+        }
       />
       <AccountForm role={role} />
     </>
@@ -1021,20 +1058,22 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
           value={form.phone}
           onChange={(v) => setForm({ ...form, phone: v })}
         />
-        {role === "athlete" && (
+        {(role === "athlete" || role === "coach" || role === "institution") && (
           <div className="grid gap-4 sm:grid-cols-2">
             <Field
-              label="Institution / school / club"
+              label={role === "coach" ? "Assigned institution" : "Institution / school / club"}
               value={organizationName}
               onChange={() => undefined}
               disabled
             />
-            <Field
-              label="Sport"
-              value={sportName}
-              onChange={() => undefined}
-              disabled
-            />
+            {role === "athlete" && (
+              <Field
+                label="Sport"
+                value={sportName}
+                onChange={() => undefined}
+                disabled
+              />
+            )}
           </div>
         )}
         <div className="flex gap-2">

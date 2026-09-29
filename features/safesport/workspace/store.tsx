@@ -650,10 +650,7 @@ export function visibleAthletes(state: State, role: Role) {
     return state.athletes.filter(
       (a) => a.id === state.guardianId && a.age < 18,
     );
-  if (role === "coach" || role === "institution")
-    return state.athletes.filter(
-      (a) => a.currentOrganization?.id === "org-001",
-    );
+  if (role === "coach" || role === "institution") return state.athletes;
   if (role === "physiotherapist") {
     const assigned = new Set(
       [
