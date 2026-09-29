@@ -190,11 +190,12 @@ export function Messages({ role }: { role: Role }) {
   }, [activeId, ingestMessage, markMessagesRead, workspace?.current_user.id]);
 
   const conversations = workspace?.conversations ?? [];
-  const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];
-
-  useEffect(() => {
-    if (active?.id) markConversationRead(active.id);
-  }, [active?.id, markConversationRead]);
+  const sortedConversations = [...conversations].sort((left, right) => {
+    const leftUnread = unreadConversationIds.includes(left.id) ? 0 : 1;
+    const rightUnread = unreadConversationIds.includes(right.id) ? 0 : 1;
+    return leftUnread - rightUnread;
+  });
+  const active = conversations.find((conversation) => conversation.id === activeId) ?? sortedConversations[0] ?? conversations[0];
 
   const people = workspace?.people.filter((person) => `${person.name} ${person.role}`.toLowerCase().includes(search.toLowerCase())) ?? [];
   const globalMessaging = role === "clinician" || role === "physiotherapist" || role === "sys-admin";
@@ -279,19 +280,22 @@ export function Messages({ role }: { role: Role }) {
       <div className="grid min-h-[600px] gap-5 lg:grid-cols-[300px_1fr]">
         <Panel title="Conversations">
           <div className="space-y-2">
-            {conversations.map((conversation) => (
+            {sortedConversations.map((conversation) => (
               <Button
                 key={conversation.id}
                 variant="ghost"
                 aria-pressed={active?.id === conversation.id}
                 className="h-auto w-full justify-start gap-3 whitespace-normal py-3 text-left aria-pressed:bg-primary/10 aria-pressed:ring-1 aria-pressed:ring-primary/20"
-                onClick={() => setActiveId(conversation.id)}
+                onClick={() => {
+                  setActiveId(conversation.id);
+                  markConversationRead(conversation.id);
+                }}
               >
                 {conversation.kind === "institution_group" ? <Users /> : <MessageSquare />}
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="truncate">{conversationLabel(conversation)}</span>
-                    {unreadConversationIds.includes(conversation.id) && active?.id !== conversation.id && (
+                    {unreadConversationIds.includes(conversation.id) && (
                       <span className="size-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)]" aria-label="Unread messages" />
                     )}
                   </span>

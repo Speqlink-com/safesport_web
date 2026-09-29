@@ -29,7 +29,7 @@ export const useMessageAlertStore = create<MessageAlertState>((set, get) => ({
   unreadConversationIds: [],
   knownMessageIds: [],
   initialized: false,
-  markRead: () => set({ hasUnread: false, unreadConversationIds: [] }),
+  markRead: () => set({ hasUnread: false }),
   markConversationRead: (conversationId) =>
     set((state) => {
       const unreadConversationIds = state.unreadConversationIds.filter((id) => id !== conversationId);
