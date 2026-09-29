@@ -11,6 +11,7 @@ import { identities, href, type Role } from "./catalog";
 import { useWorkspace } from "./store";
 import { PageHeading, Panel, Empty, Go, Choice, Status } from "./ui";
 import { messagingApi, type ConversationItem, type MessageItem, type MessageUser } from "@/features/auth/api";
+import { useMessageAlertStore } from "./message-alerts";
 import { useTheme } from "next-themes";
 import EmojiPicker, { Theme, type EmojiClickData } from "emoji-picker-react";
 const contacts: Record<Role, Role[]> = {
@@ -128,8 +129,13 @@ export function Messages({ role }: { role: Role }) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const { resolvedTheme } = useTheme();
+  const ingestWorkspace = useMessageAlertStore((state) => state.ingestWorkspace);
+  const ingestMessage = useMessageAlertStore((state) => state.ingestMessage);
+  const markMessagesRead = useMessageAlertStore((state) => state.markRead);
 
   const mergeWorkspace = (payload: { current_user: MessageUser; people: MessageUser[]; conversations: ConversationItem[] }, keepActive = true) => {
+    ingestWorkspace(payload, { suppressUnread: true, suppressSound: true });
+    markMessagesRead();
     setWorkspace(payload);
     setActiveId((current) =>
       keepActive && current && payload.conversations.some((conversation) => conversation.id === current)
@@ -175,13 +181,11 @@ export function Messages({ role }: { role: Role }) {
             : conversation,
         ),
       } : current);
-      if (incoming.sender.id !== workspace?.current_user.id) {
-        const audio = new Audio("/notification.mp3");
-        audio.play().catch(() => undefined);
-      }
+      ingestMessage(incoming, workspace?.current_user.id, { suppressUnread: true });
+      markMessagesRead();
     };
     return () => ws.close();
-  }, [activeId, workspace?.current_user.id]);
+  }, [activeId, ingestMessage, markMessagesRead, workspace?.current_user.id]);
 
   const conversations = workspace?.conversations ?? [];
   const active = conversations.find((conversation) => conversation.id === activeId) ?? conversations[0];

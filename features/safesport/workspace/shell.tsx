@@ -73,7 +73,7 @@ import {
   // additional icons
   CircleCheck,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Sidebar,
@@ -98,8 +98,9 @@ import {
   human,
 } from "./catalog";
 import { useWorkspace } from "./store";
-import { authApi } from "@/features/auth/api";
+import { authApi, messagingApi } from "@/features/auth/api";
 import { useAuthStore } from "@/features/auth/store";
+import { useMessageAlertStore } from "./message-alerts";
 import toast from "react-hot-toast";
 
 // ── Icon resolver ──────────────────────────────────────────────────────────
@@ -295,6 +296,8 @@ function StandaloneLink({
 }) {
   const { setOpenMobile } = useSidebar();
   const active = useIsActive(role, item.path);
+  const hasUnreadMessages = useMessageAlertStore((state) => state.hasUnread);
+  const showMessageDot = item.path === "messages" && hasUnreadMessages && !active;
   return (
     <Link
       href={href(role, item.path)}
@@ -311,7 +314,10 @@ function StandaloneLink({
     >
       <NavIcon name={item.icon} />
       <span className="flex-1 truncate">{item.label}</span>
-      {active && (
+      {showMessageDot && (
+        <span className="ml-auto size-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.18)] shrink-0" aria-label="Unread messages" />
+      )}
+      {active && !showMessageDot && (
         <span className="ml-auto size-1.5 rounded-full bg-primary shrink-0" aria-hidden="true" />
       )}
     </Link>
@@ -351,6 +357,37 @@ function Navigation({ role }: { role: Role }) {
   );
 }
 
+function MessageBackgroundListener({ isMessagesPage }: { isMessagesPage: boolean }) {
+  const ingestWorkspace = useMessageAlertStore((state) => state.ingestWorkspace);
+  const markRead = useMessageAlertStore((state) => state.markRead);
+  const reset = useMessageAlertStore((state) => state.reset);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      void messagingApi.workspace()
+        .then((payload) => {
+          if (active) ingestWorkspace(payload, { suppressUnread: isMessagesPage, suppressSound: isMessagesPage });
+        })
+        .catch(() => undefined);
+    };
+    load();
+    const interval = window.setInterval(load, 3000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [ingestWorkspace, isMessagesPage]);
+
+  useEffect(() => {
+    if (isMessagesPage) markRead();
+  }, [isMessagesPage, markRead]);
+
+  useEffect(() => reset, [reset]);
+
+  return null;
+}
+
 // ── WorkspaceShell ─────────────────────────────────────────────────────────
 export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
@@ -367,6 +404,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
   const displayName = authUser ? `${authUser.first_name} ${authUser.last_name}` : workspaceUser.name;
   const unread = state.notices.filter((n) => n.role === role && !n.read).length;
   const current = path.split("/").slice(3).join("/");
+  const isMessagesPage = current === "messages" || current.startsWith("messages/");
   const title =
     navigation[role].find((n) => n.path === current)?.label ||
     human(current.split("/")[0] || "Overview");
@@ -384,6 +422,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider>
+      <MessageBackgroundListener isMessagesPage={isMessagesPage} />
       {/* Skip-to-content for keyboard/screen-reader users */}
       <a
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-background focus:p-4"
