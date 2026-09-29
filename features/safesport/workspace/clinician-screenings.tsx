@@ -27,7 +27,7 @@ Video
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
 Bar,
 BarChart,
@@ -38,7 +38,8 @@ XAxis,
 YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { href,human,identities } from "./catalog";
+import { movementApi, type MovementScreeningItem } from "@/features/auth/api";
+import { href,human } from "./catalog";
 import {
 AllClearState,
 EmptyState,
@@ -52,13 +53,61 @@ StatusChip
 import { scopedRecords } from "./records";
 import {
 fullName,
-newId,
-today,
 useWorkspace,
 visibleAthletes,
 type RecordItem,
 } from "./store";
 import { Choice,Notes } from "./ui";
+
+
+function statusFromApi(status: string) {
+  if (status === "AWAITING_CLINICIAN_REVIEW" || status === "AI_COMPLETE") return "ready_for_review";
+  if (status === "RETAKE_REQUIRED") return "quality_failed";
+  if (status.startsWith("PROCESSING") || status === "QUEUED") return "processing";
+  if (["CLINICIAN_REVIEWED", "PHYSIO_REVIEWED", "REPORT_READY"].includes(status)) return "reviewed";
+  if (status === "FAILED") return "failed";
+  return "draft";
+}
+
+function numberMetric(metrics: Record<string, unknown>, key: string) {
+  const item = metrics[key];
+  if (item && typeof item === "object" && "value" in item) {
+    const value = (item as { value?: unknown }).value;
+    return typeof value === "number" ? value : undefined;
+  }
+  return undefined;
+}
+
+function recordFromApi(item: MovementScreeningItem): RecordItem {
+  const ai = item.ai_result || {};
+  const metrics = ((ai.metrics as Record<string, unknown> | undefined) || {}) as Record<string, unknown>;
+  const interpretation = ((ai.interpretation as Record<string, unknown> | undefined) || {}) as Record<string, unknown>;
+  return {
+    id: item.id,
+    athleteId: item.athlete_id,
+    title: human(item.drill.toLowerCase()),
+    kind: item.drill,
+    status: statusFromApi(item.status),
+    quality: item.status === "RETAKE_REQUIRED" ? "fail" : ai.quality ? "pass" : "pending",
+    date: item.created_at,
+    assigned: "Movement screening team",
+    notes: typeof ai.summary === "string" ? ai.summary : "",
+    file: item.video_url,
+    fileName: item.video_public_id,
+    risk: typeof ai.risk_signal === "string" ? ai.risk_signal.toLowerCase() : undefined,
+    model: typeof ai.model === "string" ? ai.model : undefined,
+    confidence: typeof ai.confidence === "number" ? ai.confidence : undefined,
+    metrics: {
+      kneeValgusAngle: numberMetric(metrics, "knee_valgus_angle") ?? 0,
+      trunkLean: numberMetric(metrics, "trunk_lean") ?? 0,
+      limbSymmetryIndex: numberMetric(metrics, "limb_symmetry_index") ?? 0,
+      stabilizationTime: numberMetric(metrics, "stabilization_time") ?? 0,
+    },
+    interpretation: typeof interpretation.summary === "string" ? interpretation.summary : undefined,
+    action: typeof item.clinician_review?.action === "string" ? item.clinician_review.action : undefined,
+    reviewer: typeof item.clinician_review?.reviewer_name === "string" ? item.clinician_review.reviewer_name : undefined,
+  };
+}
 
 // ── Screenings surface ────────────────────────────────────────────────────────
 
@@ -69,9 +118,26 @@ export function ClinicianScreenings({
   id?: string;
   reviewOnly?: boolean;
 }) {
-  const { state } = useWorkspace();
+  const { state, setState } = useWorkspace();
   const role = "clinician" as const;
   const athletes = visibleAthletes(state, role);
+
+  useEffect(() => {
+    let active = true;
+    movementApi.workspace()
+      .then((payload) => {
+        if (!active) return;
+        const apiRecords = payload.screenings.map(recordFromApi);
+        setState((current) => ({
+          ...current,
+          records: { ...current.records, screenings: apiRecords },
+        }));
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [setState]);
   let records = scopedRecords(state, role, "screenings");
   if (reviewOnly) records = records.filter((r) => r.status === "ready_for_review");
 
@@ -84,7 +150,7 @@ export function ClinicianScreenings({
             title="Screening unavailable"
             back={{ label: "Back to screenings", href: href(role, "screenings") }}
           />
-          <EmptyState icon={ScanLine} title="Screening not found" description="This record is not in your permitted demo workspace." />
+          <EmptyState icon={ScanLine} title="Screening not found" description="This record is not in your permitted workspace." />
         </div>
       );
     return <ScreeningDetail initial={detail} reviewOnly={reviewOnly} />;
@@ -226,7 +292,7 @@ function ScreeningsList({
           <DialogHeader>
             <DialogTitle>Capture movement screening</DialogTitle>
             <DialogDescription>
-              Local video preview only. No video is uploaded and no AI service is invoked in this demo.
+              Upload a field screening video and start the SafeSport AI movement review pipeline.
             </DialogDescription>
           </DialogHeader>
           {captureOpen && (
@@ -246,37 +312,33 @@ function ScreeningCapture({ onClose }: { onClose: () => void }) {
   const role = "clinician" as const;
   const athletes = visibleAthletes(state, role);
   const [athleteId, setAthleteId] = useState(athletes[0]?.id || "");
-  const [drill, setDrill] = useState("jump_landing");
-  const [file, setFile] = useState<{ name: string; url: string } | null>(null);
+  const [drill, setDrill] = useState("JUMP_LANDING");
+  const [file, setFile] = useState<{ name: string; url: string; raw: File } | null>(null);
   const consent = state.consents[athleteId];
 
   return (
     <form
       className="space-y-4"
-      onSubmit={(e) => {
+      onSubmit={async (e) => {
         e.preventDefault();
         if (!file) return;
-        const r: RecordItem = {
-          id: newId("scr"),
-          athleteId,
-          title: human(drill),
-          kind: drill,
-          status: "draft",
-          quality: "pending",
-          date: today,
-          assigned: identities.clinician.name,
-          notes: "",
-          file: file.url,
-          fileName: file.name,
-        };
-        update(
-          (s) => ({ ...s, records: { ...s.records, screenings: [r, ...s.records.screenings] } }),
-          "Movement screening captured",
-          role,
-          `screenings/${r.id}`,
-        );
-        onClose();
-        router.push(href(role, `screenings/${r.id}`));
+        try {
+          const created = await movementApi.createScreening({ athlete_safesport_id: athleteId, drill, camera_view: "FRONTAL" });
+          await movementApi.uploadVideo(created.id, file.raw);
+          const workspace = await movementApi.workspace();
+          const apiRecords = workspace.screenings.map(recordFromApi);
+          update(
+            (s) => ({ ...s, records: { ...s.records, screenings: apiRecords } }),
+            "Movement screening uploaded",
+            role,
+            `screenings/${created.id}`,
+          );
+          toast.success("Movement video uploaded");
+          onClose();
+          router.push(href(role, `screenings/${created.id}`));
+        } catch {
+          toast.error("Could not upload movement screening");
+        }
       }}
     >
       <Choice
@@ -293,7 +355,7 @@ function ScreeningCapture({ onClose }: { onClose: () => void }) {
         label="Drill"
         value={drill}
         onChange={setDrill}
-        options={["jump_landing", "single_leg_squat", "sprint_acceleration", "cutting_maneuver", "kicking_mechanics"]}
+        options={["JUMP_LANDING", "SINGLE_LEG_SQUAT"]}
       />
       <InfoNote>
         Target 1080p, 30 fps, camera 3–5 metres away. Adequate lighting. Follow the protocol for the configured frontal / sagittal view. Retake if keypoints are occluded.
@@ -318,7 +380,7 @@ function ScreeningCapture({ onClose }: { onClose: () => void }) {
                   return;
                 }
                 if (file) URL.revokeObjectURL(file.url);
-                setFile({ name: f.name, url: URL.createObjectURL(f) });
+                setFile({ name: f.name, url: URL.createObjectURL(f), raw: f });
               }}
             />
           </div>
@@ -369,22 +431,18 @@ function ScreeningDetail({
     );
   };
 
-  const simulate = () => {
+  const analyze = async () => {
     setProcessing(true);
-    setTimeout(() => {
-      save(
-        {
-          ...form,
-          status: "ready_for_review",
-          risk: "moderate",
-          model: "DEMO-2.3.1",
-          confidence: 0.82,
-          metrics: { kneeValgusAngle: 15.3, trunkLean: 12.1, limbSymmetryIndex: 0.89, stabilizationTime: 1.8 },
-        },
-        "Demo movement result ready for human review",
-      );
+    try {
+      const result = await movementApi.analyze(form.id);
+      const record = recordFromApi(result);
+      save(record, "AI movement analysis completed");
+      toast.success("AI movement analysis completed");
+    } catch {
+      toast.error("AI analysis failed. Check the video and backend logs.");
+    } finally {
       setProcessing(false);
-    }, 800);
+    }
   };
 
   const metricsData = form.metrics
@@ -425,7 +483,7 @@ function ScreeningDetail({
             <EmptyState
               icon={Video}
               title="No video attached"
-              description="This seed record has no video. Create a new screening to preview a local video. Seed metrics are demonstration data."
+              description="No video is attached to this screening yet. Upload a field screening video to run AI analysis."
             />
           )}
 
@@ -481,12 +539,12 @@ function ScreeningDetail({
                   size="sm"
                   className="w-full"
                   disabled={form.quality !== "pass" || processing}
-                  onClick={simulate}
+                  onClick={analyze}
                 >
-                  {processing ? "Preparing demo result…" : "Load simulated AI result"}
+                  {processing ? "Running AI analysis…" : "Run AI movement analysis"}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
-                  Simulated metrics are a fixed demo fixture, not an analysis of the uploaded video.
+                  Runs the SafeSport YOLO/biomechanics/LLM movement analysis on the uploaded video.
                 </p>
               </div>
             )}
@@ -561,13 +619,19 @@ function ScreeningDetail({
               {!form.reviewer ? (
                 <form
                   className="space-y-3 border-t pt-4"
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
-                    save(
-                      { ...form, status: "reviewed", reviewer: identities.clinician.name },
-                      "Movement interpretation signed",
-                    );
-                    toast.success("Human review saved");
+                    try {
+                      const reviewed = await movementApi.clinicianReview(form.id, {
+                        decision: form.action === "physiotherapy_referral" ? "REFER_PHYSIO" : "ACCEPT",
+                        interpretation: form.interpretation || "Reviewed for clinical decision support.",
+                        action: form.action || "PREVENTION",
+                      });
+                      save(recordFromApi(reviewed), "Movement interpretation signed");
+                      toast.success("Human review saved");
+                    } catch {
+                      toast.error("Could not save human review");
+                    }
                   }}
                 >
                   <Notes
@@ -620,7 +684,7 @@ function ScreeningDetail({
                 <EmptyState
                   icon={BrainCircuit}
                   title="Result pending"
-                  description="Assess video quality and load the simulated AI result to proceed with human review."
+                  description="Assess video quality and run AI movement analysis to proceed with human review."
                 />
               )}
             </div>
