@@ -9,6 +9,8 @@ import {
   CalendarDays,
   UsersRound,
   ClipboardList,
+  Copy,
+  CheckCircle2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -929,6 +931,7 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
   const setSession = useAuthStore((auth) => auth.setSession);
   const authName = authUser && authUser.role === role ? `${authUser.first_name} ${authUser.last_name}` : "";
   const authEmail = authUser && authUser.role === role ? authUser.email : "";
+  const safeSportId = authUser && authUser.role === role ? authUser.safesport_id : "";
   const profile = authUser && authUser.role === role ? authUser.profile_data : {};
   const organizationName =
     profile.organization_name ||
@@ -940,6 +943,7 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
     athlete?.currentTeam?.sport.name ||
     athlete?.teams?.[0]?.sport.name ||
     "";
+  const [copiedSafeSportId, setCopiedSafeSportId] = useState(false);
   const [form, setForm] = useState(
     state.accounts[role] ?? {
       name: athlete ? fullName(athlete) : authName || identities[role].name,
@@ -972,6 +976,30 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
           }
         }}
       >
+        {safeSportId && (
+          <div className="rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-background p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">SafeSport ID</p>
+                <p className="mt-1 font-mono text-2xl font-semibold tracking-wide text-foreground">{safeSportId}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Use this ID for guardian linking and public certificate verification.</p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(safeSportId);
+                  setCopiedSafeSportId(true);
+                  toast.success("SafeSport ID copied");
+                  window.setTimeout(() => setCopiedSafeSportId(false), 1600);
+                }}
+              >
+                {copiedSafeSportId ? <CheckCircle2 className="mr-2 size-4 text-emerald-600" /> : <Copy className="mr-2 size-4" />}
+                {copiedSafeSportId ? "Copied" : "Copy ID"}
+              </Button>
+            </div>
+          </div>
+        )}
         <Field
           label="Full name"
           value={form.name}

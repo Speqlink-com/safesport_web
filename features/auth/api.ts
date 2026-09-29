@@ -317,6 +317,34 @@ export function dashboardForRole(role: string): string {
   return `/safesport/${role}`;
 }
 
+export interface PublicCertificateSummary {
+  assessment_id: string;
+  code: string;
+  athlete_name: string;
+  safesport_id: string;
+  institution: string;
+  sport: string;
+  eligibility: string;
+  restrictions: string;
+  review_date: string;
+  clinician_signature: string;
+  issued_at: string | null;
+  download_url: string;
+}
+
+export interface PublicCertificateLookup {
+  safesport_id: string;
+  athlete_name: string;
+  institution: string;
+  sport: string;
+  certificates: PublicCertificateSummary[];
+}
+
+export const publicCertificateApi = {
+  lookupBySafeSportId: (safeSportId: string) =>
+    request<PublicCertificateLookup>(`/ppe/certificates/public/by-safesport/${encodeURIComponent(safeSportId)}`),
+};
+
 export interface PPEWorkspacePayload {
   athletes: unknown[];
   consents: Record<string, unknown>;
