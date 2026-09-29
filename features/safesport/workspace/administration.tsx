@@ -32,7 +32,7 @@ import {
   Go,
   Tabbed,
 } from "./ui";
-import { systemAdminApi, type AdminUser } from "@/features/auth/api";
+import { systemAdminApi, type AdminUser, type CatalogInstitution } from "@/features/auth/api";
 export function Teams({ role, view }: { role: Role; view?: string }) {
   const { state, update } = useWorkspace();
   const [teamId, setTeamId] = useState("all");
@@ -535,6 +535,7 @@ type UserDraft = {
   role: AdminUser["role"];
   isActive: boolean;
   password: string;
+  institutionId: string;
 };
 
 const emptyUserDraft: UserDraft = {
@@ -544,17 +545,24 @@ const emptyUserDraft: UserDraft = {
   role: "coach",
   isActive: true,
   password: "",
+  institutionId: "",
 };
 
 function SystemAdminUsers({ view }: { view?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [institutions, setInstitutions] = useState<CatalogInstitution[]>([]);
   const [editing, setEditing] = useState<UserDraft | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      setUsers(await systemAdminApi.users());
+      const [userRows, institutionRows] = await Promise.all([
+        systemAdminApi.users(),
+        systemAdminApi.institutions(),
+      ]);
+      setUsers(userRows);
+      setInstitutions(institutionRows);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Unable to load users");
     } finally {
@@ -563,21 +571,8 @@ function SystemAdminUsers({ view }: { view?: string }) {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    void systemAdminApi.users()
-      .then((rows) => {
-        if (active) setUsers(rows);
-      })
-      .catch((error) => {
-        if (active) toast.error(error instanceof Error ? error.message : "Unable to load users");
-      })
-      .finally(() => {
-        if (active) setIsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    void load();
+  }, [load]);
 
   const edit = (user: AdminUser) => {
     setEditing({
@@ -588,6 +583,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
       role: user.role,
       isActive: user.is_active,
       password: "",
+      institutionId: user.profile_data?.institution_id || user.profile_data?.organization_id || "",
     });
   };
 
@@ -596,6 +592,11 @@ function SystemAdminUsers({ view }: { view?: string }) {
     if (!editing) return;
     if (!editing.id && editing.password.length < 8) {
       toast.error("Password must contain at least 8 characters");
+      return;
+    }
+    const needsInstitution = editing.role === "coach" || editing.role === "institution";
+    if (needsInstitution && !editing.institutionId) {
+      toast.error("Select the institution this user belongs to");
       return;
     }
     setIsSaving(true);
@@ -607,6 +608,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
           role: editing.role,
           is_active: editing.isActive,
           ...(editing.password ? { password: editing.password } : {}),
+          ...(needsInstitution ? { institution_id: editing.institutionId } : {}),
         });
         toast.success("User updated");
       } else {
@@ -617,6 +619,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
           role: editing.role,
           password: editing.password,
           is_active: editing.isActive,
+          ...(needsInstitution ? { institution_id: editing.institutionId } : {}),
         });
         toast.success("User created");
       }
@@ -656,7 +659,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
                       id: user.id,
                       name: `${user.first_name} ${user.last_name}`,
                       status: user.is_active ? "active" : "suspended",
-                      detail: `${human(user.role)} · ${user.email}`,
+                      detail: `${human(user.role)} · ${user.safesport_id} · ${user.profile_data?.organization_name || user.email}`,
                       date: user.created_at.slice(0, 10),
                       action: (
                         <Button variant="outline" onClick={() => edit(user)}>
@@ -728,6 +731,17 @@ function SystemAdminUsers({ view }: { view?: string }) {
                 onChange={(value) => setEditing({ ...editing, role: value as AdminUser["role"] })}
                 options={roles.map((item) => ({ value: item, label: identities[item].title }))}
               />
+              {(editing.role === "coach" || editing.role === "institution") && (
+                <Choice
+                  label="Institution"
+                  value={editing.institutionId}
+                  onChange={(value) => setEditing({ ...editing, institutionId: value })}
+                  options={[
+                    { value: "", label: "Select institution" },
+                    ...institutions.map((institution) => ({ value: institution.id, label: institution.name })),
+                  ]}
+                />
+              )}
               <Choice
                 label="Access status"
                 value={editing.isActive ? "active" : "suspended"}

@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   UserIcon,
   UsersIcon,
-  BuildingIcon,
   ArrowRightIcon,
 } from "lucide-react";
 
@@ -24,8 +23,6 @@ export default function SignUpPage() {
       router.push("/account/signup/athlete/name");
     } else if (selectedRole === "guardian") {
       router.push("/account/signup/guardian/name");
-    } else if (selectedRole === "institution") {
-      router.push("/account/request-demo");
     }
   };
 
@@ -38,7 +35,7 @@ export default function SignUpPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card
           className={`p-6 cursor-pointer transition-all hover:border ${
             selectedRole === "athlete" ? "border bg-primary/5" : ""
@@ -72,25 +69,6 @@ export default function SignUpPage() {
               <h3 className="font-semibold text-lg">Parent / Guardian</h3>
               <p className="text-sm text-muted-foreground mt-2">
                 Manage your child&apos;s SafeSport journey
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        <Card
-          className={`p-6 cursor-pointer transition-all hover:border ${
-            selectedRole === "institution" ? "border bg-primary/5" : ""
-          }`}
-          onClick={() => handleRoleSelect("institution")}
-        >
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="flex size-16 items-center justify-center rounded-full bg-accent/10">
-              <BuildingIcon className="size-8 text-accent-foreground" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-lg">Institution</h3>
-              <p className="text-sm text-muted-foreground mt-2">
-                Bring SafeSport to your school, club or academy
               </p>
             </div>
           </div>

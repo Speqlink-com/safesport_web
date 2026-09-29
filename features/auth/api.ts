@@ -90,6 +90,8 @@ export const authApi = {
     request<{ detail: string }>("/auth/register/verify", { method: "POST", body: JSON.stringify({ code }) }),
   resendRegistrationOtp: () => request<{ detail: string }>("/auth/register/resend", { method: "POST" }),
   currentRegistration: () => request<PendingRegistration>("/auth/register/current"),
+  lookupGuardianAthlete: (safeSportId: string) =>
+    request<GuardianAthleteLookup>(`/auth/register/guardian/athlete/${encodeURIComponent(safeSportId)}`),
   completeRegistration: () => request<SessionResponse>("/auth/register/complete", { method: "POST" }),
   forgotPassword: (email: string) =>
     request<{ detail: string }>("/auth/password/forgot", {
@@ -102,6 +104,15 @@ export const authApi = {
       body: JSON.stringify({ password }),
     }),
 };
+
+export interface GuardianAthleteLookup {
+  id: string;
+  safesport_id: string;
+  first_name: string;
+  last_name: string;
+  organization_name: string;
+  sport_name: string;
+}
 
 export interface CatalogSport {
   id: string;
@@ -132,6 +143,7 @@ export interface AdminOverview {
 
 export interface AdminUser {
   id: string;
+  safesport_id: string;
   email: string;
   first_name: string;
   last_name: string;
@@ -146,6 +158,7 @@ export interface AdminUser {
     | "sys-admin";
   is_active: boolean;
   is_verified: boolean;
+  profile_data: Record<string, string>;
   created_at: string;
 }
 
@@ -156,6 +169,7 @@ export interface AdminUserPayload {
   role: AdminUser["role"];
   password?: string;
   is_active: boolean;
+  institution_id?: string;
 }
 
 export const catalogApi = {

@@ -10,6 +10,7 @@ export type AuthRole =
 
 export interface SessionUser {
   id: string;
+  safesport_id: string;
   email: string;
   first_name: string;
   last_name: string;
