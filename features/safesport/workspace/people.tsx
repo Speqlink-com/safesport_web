@@ -982,7 +982,9 @@ function AccountForm({ role, athlete }: { role: Role; athlete?: Athlete }) {
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700 dark:text-emerald-300">SafeSport ID</p>
                 <p className="mt-1 font-mono text-2xl font-semibold tracking-wide text-foreground dark:text-emerald-50">{safeSportId}</p>
-                <p className="mt-1 text-xs text-muted-foreground">Use this ID for guardian linking and public certificate verification.</p>
+                {role === "athlete" && (
+                  <p className="mt-1 text-xs text-muted-foreground">Use this ID for guardian linking and public certificate verification.</p>
+                )}
               </div>
               <Button
                 type="button"
