@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://server.ayothealthsolutions.ke/api/v1" : "http://localhost:8000/api/v1");
 const ACCESS_COOKIE = "safesport_access";
 const REFRESH_COOKIE = "safesport_refresh";
 const ROLES = new Set([

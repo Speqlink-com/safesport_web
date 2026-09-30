@@ -1,6 +1,6 @@
 import type { PendingRegistration, SessionResponse } from "./types/session";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? (process.env.NODE_ENV === "production" ? "https://server.ayothealthsolutions.ke/api/v1" : "http://localhost:8000/api/v1");
 const CSRF_COOKIE = "safesport_csrf";
 
 export class AuthApiError extends Error {
