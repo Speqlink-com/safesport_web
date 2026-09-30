@@ -109,6 +109,35 @@ function recordFromApi(item: MovementScreeningItem): RecordItem {
   };
 }
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function analysisIsPending(record: RecordItem) {
+  return record.status === "processing";
+}
+
+function AiAnalysisLoader() {
+  return (
+    <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex items-end gap-1.5" aria-hidden="true">
+          {["[animation-delay:0ms]", "[animation-delay:140ms]", "[animation-delay:280ms]"].map((delayClass) => (
+            <span
+              key={delayClass}
+              className={`size-2.5 animate-bounce rounded-full bg-sky-500 ${delayClass}`}
+            />
+          ))}
+        </div>
+        <div>
+          <p className="text-sm font-semibold">Running AI movement analysis</p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Processing pose, biomechanics, risk signal and clinical interpretation.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Screenings surface ────────────────────────────────────────────────────────
 
 export function ClinicianScreenings({
@@ -408,15 +437,25 @@ function ScreeningDetail({
   initial: RecordItem;
   reviewOnly: boolean;
 }) {
-  const { state, update } = useWorkspace();
+  const { state, setState, update } = useWorkspace();
   const role = "clinician" as const;
   const [form, setForm] = useState(initial);
   const [processing, setProcessing] = useState(false);
   const [reason, setReason] = useState("");
   const athlete = state.athletes.find((a) => a.id === form.athleteId);
 
-  const save = (record: RecordItem, title: string) => {
+  const save = (record: RecordItem, title: string, notify = true) => {
     setForm(record);
+    if (!notify) {
+      setState((s) => ({
+        ...s,
+        records: {
+          ...s.records,
+          screenings: s.records.screenings.map((r) => (r.id === record.id ? record : r)),
+        },
+      }));
+      return;
+    }
     update(
       (s) => ({
         ...s,
@@ -434,10 +473,28 @@ function ScreeningDetail({
   const analyze = async () => {
     setProcessing(true);
     try {
-      const result = await movementApi.analyze(form.id);
-      const record = recordFromApi(result);
-      save(record, "AI movement analysis completed");
-      toast.success("AI movement analysis completed");
+      const started = recordFromApi(await movementApi.analyze(form.id));
+      save(started, "AI movement analysis started");
+      toast.success("AI movement analysis started");
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await sleep(2500);
+        const workspace = await movementApi.workspace();
+        const latest = workspace.screenings.find((item) => item.id === form.id);
+        if (!latest) continue;
+        const record = recordFromApi(latest);
+        save(record, "AI movement analysis completed", !analysisIsPending(record));
+        if (!analysisIsPending(record)) {
+          if (record.status === "failed") {
+            toast.error("AI analysis failed. Check the video and backend logs.");
+          } else {
+            toast.success("AI movement analysis completed");
+          }
+          return;
+        }
+      }
+
+      toast("AI analysis is still running. This screen will show the result when refreshed.");
     } catch {
       toast.error("AI analysis failed. Check the video and backend logs.");
     } finally {
@@ -538,10 +595,10 @@ function ScreeningDetail({
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  disabled={form.quality !== "pass" || processing}
+                  disabled={form.quality !== "pass" || processing || analysisIsPending(form)}
                   onClick={analyze}
                 >
-                  {processing ? "Running AI analysis…" : "Run AI movement analysis"}
+                  {processing || analysisIsPending(form) ? "Running AI analysis…" : "Run AI movement analysis"}
                 </Button>
                 <p className="text-xs text-muted-foreground text-center">
                   Runs the SafeSport YOLO/biomechanics/LLM movement analysis on the uploaded video.
@@ -557,7 +614,11 @@ function ScreeningDetail({
             AI movement-risk signals support clinical interpretation. They do not determine medical eligibility. Human review is required before any clinical action.
           </InfoNote>
 
-          {form.risk && form.quality !== "fail" ? (
+          {processing || analysisIsPending(form) ? (
+            <div className="mt-4">
+              <AiAnalysisLoader />
+            </div>
+          ) : form.risk && form.quality !== "fail" ? (
             <div className="mt-4 space-y-4">
               {/* Risk level */}
               <div className="flex items-center justify-between">
