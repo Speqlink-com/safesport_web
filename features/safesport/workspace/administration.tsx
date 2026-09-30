@@ -50,6 +50,15 @@ export function Teams({ role, view }: { role: Role; view?: string }) {
   const athletes = visibleAthletes(state, role).filter(
     (a) => teamId === "all" || a.currentTeam?.id === teamId,
   );
+  const teamsWithVisibleAthletes = new Set(
+    visibleAthletes(state, role)
+      .map((athlete) => athlete.currentTeam?.id)
+      .filter(Boolean),
+  );
+  const visibleTeams =
+    view === "attendance" || view === "readiness"
+      ? permitted.filter((team) => teamsWithVisibleAthletes.has(team.id))
+      : permitted;
   const canEdit = ["institution", "operations", "sys-admin"].includes(role);
   return (
     <>
@@ -73,11 +82,11 @@ export function Teams({ role, view }: { role: Role; view?: string }) {
         onChange={setTeamId}
         options={[
           { value: "all", label: "All teams" },
-          ...permitted.map((t) => ({ value: t.id, label: t.name })),
+          ...visibleTeams.map((t) => ({ value: t.id, label: t.name })),
         ]}
       />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {permitted
+        {visibleTeams
           .filter((t) => teamId === "all" || t.id === teamId)
           .map((t) => (
             <Panel
