@@ -548,6 +548,12 @@ const emptyUserDraft: UserDraft = {
   institutionId: "",
 };
 
+const institutionScopedRoles: AdminUser["role"][] = ["athlete", "coach", "institution"];
+
+function needsInstitution(role: AdminUser["role"]) {
+  return institutionScopedRoles.includes(role);
+}
+
 function SystemAdminUsers({ view }: { view?: string }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [institutions, setInstitutions] = useState<CatalogInstitution[]>([]);
@@ -594,8 +600,8 @@ function SystemAdminUsers({ view }: { view?: string }) {
       toast.error("Password must contain at least 8 characters");
       return;
     }
-    const needsInstitution = editing.role === "coach" || editing.role === "institution";
-    if (needsInstitution && !editing.institutionId) {
+    const requiresInstitution = needsInstitution(editing.role);
+    if (requiresInstitution && !editing.institutionId) {
       toast.error("Select the institution this user belongs to");
       return;
     }
@@ -608,7 +614,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
           role: editing.role,
           is_active: editing.isActive,
           ...(editing.password ? { password: editing.password } : {}),
-          ...(needsInstitution ? { institution_id: editing.institutionId } : {}),
+          ...(requiresInstitution ? { institution_id: editing.institutionId } : {}),
         });
         toast.success("User updated");
       } else {
@@ -619,7 +625,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
           role: editing.role,
           password: editing.password,
           is_active: editing.isActive,
-          ...(needsInstitution ? { institution_id: editing.institutionId } : {}),
+          ...(requiresInstitution ? { institution_id: editing.institutionId } : {}),
         });
         toast.success("User created");
       }
@@ -659,7 +665,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
                       id: user.id,
                       name: `${user.first_name} ${user.last_name}`,
                       status: user.is_active ? "active" : "suspended",
-                      detail: `${human(user.role)} · ${user.safesport_id} · ${user.profile_data?.organization_name || user.email}`,
+                      detail: `${human(user.role)} · ${user.safesport_id} · ${user.profile_data?.organization_name || "No institution"} · ${user.email}`,
                       date: user.created_at.slice(0, 10),
                       action: (
                         <Button variant="outline" onClick={() => edit(user)}>
@@ -731,7 +737,7 @@ function SystemAdminUsers({ view }: { view?: string }) {
                 onChange={(value) => setEditing({ ...editing, role: value as AdminUser["role"] })}
                 options={roles.map((item) => ({ value: item, label: identities[item].title }))}
               />
-              {(editing.role === "coach" || editing.role === "institution") && (
+              {needsInstitution(editing.role) && (
                 <Choice
                   label="Institution"
                   value={editing.institutionId}

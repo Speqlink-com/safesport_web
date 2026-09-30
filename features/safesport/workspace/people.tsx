@@ -875,10 +875,13 @@ export function Health({ role, view }: { role: Role; view?: string }) {
                     .filter((e) => e.athleteId === a.id)
                     .map((e) => ({
                       id: e.id,
-                      name: "PPE assessment",
+                      name: e.status === "blocked" ? "PPE consent required" : "PPE assessment",
                       status: e.status,
                       date: e.date,
-                      detail: "Clinician-led assessment",
+                      detail:
+                        e.status === "blocked" && state.consents[a.id]?.clinical !== "obtained"
+                          ? "Clinical consent is required before assessment can continue"
+                          : "Clinician-led assessment",
                     })),
                   ...state.records.events
                     .filter((e) => e.athleteId === a.id)
