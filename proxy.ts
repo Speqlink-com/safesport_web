@@ -63,9 +63,9 @@ export async function proxy(request: NextRequest) {
   }
 
   if (isAuthRoute && (hasAccessCookie || hasValidRefreshCookie)) {
-    const role = hasAccessCookie ? await sessionRole(request) : null;
-    if (role) return redirect(request, `/safesport/${role}`);
     if (hasValidRefreshCookie) return redirect(request, "/safesport");
+    const role = await sessionRole(request);
+    if (role) return redirect(request, `/safesport/${role}`);
   }
 
   return NextResponse.next();
