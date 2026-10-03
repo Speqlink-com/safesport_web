@@ -37,9 +37,9 @@ export function SignInForm() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Welcome Back 👋</h1>
         <p className="text-muted-foreground">
-          <b>Smarter sports. Safer athletes.</b> <br />
-          Sign in to manage your athletes, monitor risk, and keep your team
-          ready.
+          <b>Clinically Led Athlete Health and Safety Platform.</b> <br />
+          Sign in to manage athlete assessments, injuries, follow-up and
+          participation records.
         </p>
       </div>
 
@@ -87,12 +87,20 @@ export function SignInForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-muted-foreground">
-        Don&apos;t you have an account?{" "}
-        <Link href="/account/signup" className="text-primary hover:underline">
-          Sign up
-        </Link>
-      </p>
+      <div className="space-y-2 text-center text-sm text-muted-foreground">
+        <p>
+          Don&apos;t have an account?{" "}
+          <Link href="/account/signup" className="text-primary hover:underline">
+            Sign up
+          </Link>
+        </p>
+        <p>
+          Organisation or clinic?{" "}
+          <Link href="/account/request-access" className="text-primary hover:underline">
+            Request institutional access
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

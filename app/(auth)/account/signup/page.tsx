@@ -29,9 +29,9 @@ export default function SignUpPage() {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Welcome to SafeSport™</h1>
+        <h1 className="text-3xl font-bold">Request Institutional Access</h1>
         <p className="text-muted-foreground text-lg">
-          What brings you to SafeSport?
+          Access is provided to registered institutions and authorised practitioners. Select your role to continue.
         </p>
       </div>
 
@@ -49,7 +49,7 @@ export default function SignUpPage() {
             <div>
               <h3 className="font-semibold text-lg">Athlete</h3>
               <p className="text-sm text-muted-foreground mt-2">
-                Track your health, sports journey and performance
+                Complete your health assessment and manage your participation records
               </p>
             </div>
           </div>
@@ -68,7 +68,7 @@ export default function SignUpPage() {
             <div>
               <h3 className="font-semibold text-lg">Parent / Guardian</h3>
               <p className="text-sm text-muted-foreground mt-2">
-                Manage your child&apos;s SafeSport journey
+                Support your child&apos;s health assessments and participation clearance
               </p>
             </div>
           </div>

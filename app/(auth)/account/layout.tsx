@@ -1,5 +1,6 @@
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import Logo from "@/components/Logo";
 import ThemeSwitcher from "@/components/theme_switcher";
 
@@ -21,15 +22,24 @@ export default function Auth_layout({
           {children}
         </div>
 
-        <footer className="w-full text-center text-xs text-muted-foreground mt-8">
-          © 2026 ALL RIGHTS RESERVED
+        <footer className="w-full text-center text-xs text-muted-foreground mt-8 space-y-1.5">
+          <p>
+            © 2026 AYOT Health Solutions Limited. All rights reserved.
+          </p>
+          <p>
+            <Link href="/privacy" className="hover:underline underline-offset-2">
+              Privacy Notice
+            </Link>
+            {" · "}
+            All athlete health data is encrypted in transit and at rest, and processed in accordance with applicable data protection law.
+          </p>
         </footer>
       </div>
 
       {/* Right Side - Image */}
       <div className="hidden lg:block relative rounded-4xl overflow-hidden border">
         <Image
-          src="/imgs/safe.png"
+          src="/imgs/safe2.png"
           alt="Safe"
           fill
           className="object-cover object-left"
