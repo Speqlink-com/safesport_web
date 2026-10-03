@@ -29,9 +29,9 @@ export default function SignUpPage() {
   return (
     <div className="w-full max-w-2xl space-y-8">
       <div className="space-y-2 text-center">
-        <h1 className="text-3xl font-bold">Request Institutional Access</h1>
+        <h1 className="text-3xl font-bold">Create your account</h1>
         <p className="text-muted-foreground text-lg">
-          Access is provided to registered institutions and authorised practitioners. Select your role to continue.
+          Select your role to get started with SafeSport™.
         </p>
       </div>
 
