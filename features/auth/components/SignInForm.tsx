@@ -37,8 +37,7 @@ export function SignInForm() {
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Welcome Back 👋</h1>
         <p className="text-muted-foreground">
-          <b>Clinically Led Athlete Health and Safety Platform.</b> <br />
-          Sign in to manage athlete assessments, injuries, follow-up and
+           Sign in to manage athlete assessments, injuries, follow-up and
           participation records.
         </p>
       </div>
